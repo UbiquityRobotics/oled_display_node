@@ -44,12 +44,14 @@
 #define  DISPLAY_ROS_MSG_TYPE  "DisplayOutput"
 
 // Type and I2C address of the display
-// These small OLED displays typically use either the SSG1106 or the SSH1106 controller.
-// The SSG1106 is fairly compatible with SSD1306 basic, the difference is that the SSH1106 control chip
+// The small 1.3" OLED displays typically use the SH1106 controller chip
+// The 0.96" OLED display tends to use the SSD1306 controller.
+// The SH1106 is fairly compatible with SSD1306 basic, the difference is that the SH1106 control chip
 // RAM space is 132*64, while SSD1306 space is 128*64.
+// This code supports the 1.3" OLED with the SH1106 controller chip by default
 // So besides different initialization bytes the display starts 2 bytes later in one vs the other
 #define OLED_DISPLAY_TYPE  DISPLAY_TYPE_SH1106
-#define OLED_DISPLAY_ADDR  SSD1306_OLED_I2C_ADDRESS
+#define OLED_DISPLAY_ADDR  SH1106_OLED_I2C_ADDRESS
 #define OLED_I2C_DEVICE    "/dev/i2c-1"          // SYSTEM SPECIFIC
 
 /************************************************************************************

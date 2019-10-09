@@ -64,6 +64,7 @@ typedef struct {
 
 // SLA (0x3C) + WRITE_MODE (0x00) =  0x78 (0b01111000)
 #define SSD1306_OLED_I2C_ADDRESS   0x3C
+#define SH1106_OLED_I2C_ADDRESS    0x3C
 
 // Control byte
 #define OLED_CONTROL_BYTE_CMD_SINGLE    0x80
