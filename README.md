@@ -36,8 +36,8 @@ The node will start and then print the linux network name on top line and then t
 
 To launch the node from a ROS launch file add to the launch file these lines:
 
-* <node pkg="display_node" type="display_node" name="display_node" output="screen">
-* </node>
+    <node pkg="display_node" type="display_node" name="display_node" output="screen">
+    </node>
 
 ### Test or Example Script
 A very simple python script that sends a few messasges to the display node has been supplied.
