@@ -13,7 +13,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs genmsg message_gen
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-catkin_python_setup()
+# catkin_python_setup()
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -81,7 +81,9 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS},
+  include
 )
+
 
 ## Specify library search paths and note we make pixy lib external to catkin
 #link_directories(
@@ -94,15 +96,17 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(display_node src/display_node.cpp)
+add_executable(display_node src/display_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(display_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(display_node 
+    ${catkin_LIBRARIES}
+)
+
+add_dependencies(display_node display_node_generate_messages_cpp)
 
 #############
 ## Install ##
@@ -156,10 +160,4 @@ include_directories(
 ## Declare a catkin package   (This was in example but no 'stub' appears in file above??
 ## catkin_package()
 
-## Build nodes for this bot
-include_directories(include ${catkin_INCLUDE_DIRS})
-
-add_executable(display_node src/display_node.cpp)
-target_link_libraries(display_node ${catkin_LIBRARIES})
-add_dependencies(display_node display_node_generate_messages_cpp)
 

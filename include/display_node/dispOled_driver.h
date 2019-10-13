@@ -20,10 +20,6 @@
 
 // ROS level defines specific to this node and its messages are here
 #define  ROS_TOPIC_DISPLAY_NODE     "display_node"
-#define  MSG_DISPLAY_ALL               1        // The entire display (all lines) written with just this info
-#define  MSG_DISPLAY_SUBSTRING         2        // Here we display on a single line N bytes of the message
-#define  MSG_DISPLAY_STARTUP_STRING    3        // Set the power on bootup string
-#define  MSG_DISPLAY_SET_BRIGHTNESS    4        // Set the display brightness
 
 // max segment index for (pixel) on right of display (seg 0 is 1st on left)
 // This must be a power of 2 minus 1 for code to work properly

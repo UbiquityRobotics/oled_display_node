@@ -10,7 +10,7 @@ modification, are permitted provided that the following conditions are met:
 * Redistributions in binary form must reproduce the above copyright notice,
   this list of conditions and the following disclaimer in the documentation
   and/or other materials provided with the distribution.
-* Neither the name of fiducial_follow nor the names of its
+* Neither the name of display_node nor the names of its
   contributors may be used to endorse or promote products derived from
   this software without specific prior written permission.
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
@@ -73,17 +73,17 @@ class Controller:
     def run(self):
        print "ROS publisher publishing commands to display topic"
 
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        self.publishDisplayCommand(3, 2, "Data for the", "Write to a line")
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        self.publishDisplayCommand(4, 2, "Application ", "Write to a line")
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        self.publishDisplayCommand(5, 2, "will now be ", "Write to a line")
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        self.publishDisplayCommand(6, 2, "written to  ", "Write to a line")
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        self.publishDisplayCommand(7, 2, "OLED display", "Write to a line")
-       time.sleep(1.0)
+       rospy.sleep(1.0)
        print "Commands sent "
 
 

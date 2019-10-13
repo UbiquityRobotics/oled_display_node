@@ -29,7 +29,6 @@
  *
  */
 
-
 /*
  * Display Output Subsystem
  *
@@ -38,10 +37,7 @@
  * Full update or substring updates starting at a given line and row are supported.
  */
 
-#define  THIS_NODE_NAME    "display_node"        // The Name for this ROS node
-
-// Listen to the topic ROS_TOPIC_DISPLAY_NODE for messages of the type below
-#define  DISPLAY_ROS_MSG_TYPE  "DisplayOutput"
+#define  THIS_NODE_NAME    "display_node"        // The Name for this ROS node. Used in ROS_INFO and more
 
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
@@ -108,8 +104,8 @@ extern  int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispTy
 extern  int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr);
 extern  int dispOled_clearDisplay(dispCtx_t *dispCtx);
 extern  int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line);
-extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_t center, char *textStr);
-
+extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, 
+                uint8_t center, const char *textStr);
 
 /*
  * @name    getPopen
@@ -316,27 +312,26 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t
 int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
         int retCode = 0;
         uint8_t curserSetup[8];
-    uint8_t *bytePtr = &curserSetup[0];
 
         switch (dispCtx->dispType) {
         case DISPLAY_TYPE_SSD1306:
-                *bytePtr++ = OLED_CONTROL_BYTE_CMD_STREAM;
-                *bytePtr++ = OLED_CMD_SET_COLUMN_RANGE;
-                *bytePtr++ = column;            // Start of printing from left seg as 0
-                *bytePtr++ = dispCtx->maxHorzPixel;     // last index of printing segments
-                *bytePtr++ = OLED_CMD_SET_PAGE_RANGE;
-                *bytePtr++ = line;                      // We assume only one line written to at a time
-                *bytePtr++ = line;                      // We assume only one line written to at a time
+                curserSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                curserSetup[1] = OLED_CMD_SET_COLUMN_RANGE;
+                curserSetup[2] = column;            // Start of printing from left seg as 0
+                curserSetup[3] = dispCtx->maxHorzPixel;     // last index of printing segments
+                curserSetup[4] = OLED_CMD_SET_PAGE_RANGE;
+                curserSetup[5] = line;                      // We assume only one line written to at a time
+                curserSetup[6] = line;                      // We assume only one line written to at a time
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
                 retCode = dispOled_writeBytes(dispCtx, &curserSetup[0], 7);
 
         case DISPLAY_TYPE_SH1106:
                 // SH1106 has different addressing than SSD1306
-                *bytePtr++ = OLED_CONTROL_BYTE_CMD_STREAM;
-                *bytePtr++ = 0xB0 | (line & 0xf);
-                *bytePtr++ = 0x00 | ((column + dispCtx->horzOffset) & 0xf);     // Lower column address
-                *bytePtr++ = 0x10 | ((column + dispCtx->horzOffset) >> 4);      // Upper column address
+                curserSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                curserSetup[1] = 0xB0 | (line & 0xf);
+                curserSetup[2] = 0x00 | ((column + dispCtx->horzOffset) & 0xf);     // Lower column address
+                curserSetup[3] = 0x10 | ((column + dispCtx->horzOffset) >> 4);      // Upper column address
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
                 retCode = dispOled_writeBytes(dispCtx, &curserSetup[0], 4);
@@ -393,12 +388,12 @@ int dispOled_clearDisplay(dispCtx_t *dispCtx) {
  *
  * @return              Returns 0 for ok or -1 for IO error
  */
-int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_t center, char *textStr) {
-        int     retCode = 0;
-        char    *text = textStr;
-        uint8_t text_len = strlen(text);
-        uint8_t dispData[DISPLAY_MAX_HORZ_PIXEL];
-        int     dispDataIdx = 1;
+int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_t center, const char *textStr) {
+    int           retCode = 0;
+    const char    *text = textStr;
+    uint8_t       text_len = strlen(text);
+    uint8_t       dispData[DISPLAY_MAX_HORZ_PIXEL];
+    int           dispDataIdx = 1;
 
     dispData[0] = OLED_CONTROL_BYTE_DATA_STREAM;     // Data starts on byte after this 1st one
 
@@ -531,14 +526,14 @@ void displayApiCallback(const display_node::DisplayOutput::ConstPtr& msg)
    // Now send data to the display
 
    switch (msg->actionType) {
-     case MSG_DISPLAY_STARTUP_STRING:
+     case display_node::DisplayOutput::DISPLAY_STARTUP_STRING:
        displaySetStartupString(msg->row, msg->text.c_str(), i2cSemLockId);
        break;
-     case MSG_DISPLAY_SET_BRIGHTNESS:
+     case display_node::DisplayOutput::DISPLAY_SET_BRIGHTNESS:
        displaySetBrightness(msg->attributes, i2cSemLockId);
        break;
-     case MSG_DISPLAY_ALL:
-     case MSG_DISPLAY_SUBSTRING:
+     case display_node::DisplayOutput::DISPLAY_ALL:
+     case display_node::DisplayOutput::DISPLAY_SUBSTRING:
        displayUpdate(msg->text.c_str(), msg->attributes, msg->row, msg->column, msg->numChars, i2cSemLockId);
        break;
      default:
@@ -566,14 +561,12 @@ int main(int argc, char **argv)
   dispCtx_t oledDisplayCtx;
   dispOled_init(OLED_I2C_DEVICE, &oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
   dispOled_clearDisplay(&oledDisplayCtx);
-  strcpy(dispBuf, hostname.c_str());
-  dispOled_writeText(&oledDisplayCtx, 0, 0, 1, dispBuf);
-  strcpy(dispBuf, firstIpAddress.c_str());
-  dispOled_writeText(&oledDisplayCtx, 2, 0, 1, dispBuf);
+  dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
+  dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
 
   ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
   ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
-      ROS_TOPIC_DISPLAY_NODE, DISPLAY_ROS_MSG_TYPE );
+      ROS_TOPIC_DISPLAY_NODE, "DisplayOutput" );
 
   // Set to subscribe to the display topic and we then get callbacks for each message
   ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 1000, displayApiCallback);
