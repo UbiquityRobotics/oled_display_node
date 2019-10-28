@@ -1,14 +1,14 @@
 
-# Display Output ROS Node
+# OLED Display Output ROS Node
 
 
-This module implements a ROS node (process) that does Display Updates to an OLED display
+This module implements a ROS node (process) that does Display Updates to an OLED display connected on I2C.
 The node does some initial messages and then will subscribe to an inbound ROS topic  and act on messages for update of lines on the display. 
 Full line or line substring updates starting at a given X pixel on the given line are supported.
 
 The tested display is the 1.3" diagonal display using a SH1106 chip controlled over the I2C bus.
-We prefer the pinout with  Ground, Vcc, SCL then SDA lines for use with Ubiquity Robotics rev 5.1 main board.
-These displays are easily found on EBay but be sure the controller chip is the SH1106.
+We prefer the pinout with  Ground, Vcc, SCL then SDA lines for use with Ubiquity Robotics rev 5.x main boards.
+These displays are easily found on EBay but be sure the controller chip is the SH1106 and that they will work with a 3.3V supply and 3.3V I2C control.
 
 The 1.3" OLED display using the SH1106 controller chip offers 8 lines of 15 characters 
 The SH1106 is closely compatible with SSD1306 display that is typically the 0.96" OLED display.
@@ -24,11 +24,11 @@ The difference is mostly at initialization and then changing the pixel X offset 
 
 ### Subscriptions
 
-* `display_node` (msgs/DisplayOutput): Listen for display updates
+* `oled_display_node` (msgs/DisplayOutput): Listen for display updates
 
 ### Manually Launching the Node
 
-* roslaunch display_node display.launch
+* roslaunch oled_display_node display.launch
 
 The node will start and then print the linux network name on top line and then the IP address will be on the 3rd line.
 
@@ -36,7 +36,7 @@ The node will start and then print the linux network name on top line and then t
 
 To launch the node from a ROS launch file add to the launch file these lines:
 
-    <node pkg="display_node" type="display_node" name="display_node" output="screen">
+    <node pkg="oled_display_node" type="oled_display_node" name="oled_display_node" output="screen">
     </node>
 
 ### Test or Example Script

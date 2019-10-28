@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>display_node</name>
+  <name>oled_display_node</name>
   <version>1.0.0</version>
-  <description>display package</description>
+  <description>OLED I2C display node package</description>
 
   <maintainer email="mj@ubiquityrobotics.com">Mark Johnston</maintainer>
 
