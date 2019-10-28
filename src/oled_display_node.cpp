@@ -37,7 +37,7 @@
  * Full update or substring updates starting at a given line and row are supported.
  */
 
-#define  THIS_NODE_NAME    "display_node"        // The Name for this ROS node. Used in ROS_INFO and more
+#define  THIS_NODE_NAME    "oled_display_node"        // The Name for this ROS node. Used in ROS_INFO and more
 
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
@@ -93,10 +93,10 @@
 #include <unistd.h>
 
 // Includes specific to the display driver and font
-#include <display_node/dispOled_driver.h>
-#include <display_node/font8x8_basic.h>
+#include <oled_display_node/oled_display.h>
+#include <oled_display_node/font8x8_basic.h>
 
-#include <display_node/DisplayOutput.h>
+#include <oled_display_node/DisplayOutput.h>
 
 // External Defs which we keep hidden in this node
 extern  int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars);
@@ -515,7 +515,7 @@ int displaySetBrightness(int brightness, int semLock)
 /**
  * Receive mmessages for display output
  */
-void displayApiCallback(const display_node::DisplayOutput::ConstPtr& msg)
+void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
 {
   ROS_DEBUG("%s heard display output msg: of actionType %d row %d column %d numChars %d attr 0x%x text %s comment %s]",
                 THIS_NODE_NAME, msg->actionType, msg->row, msg->column, msg->numChars, msg->attributes,
@@ -526,14 +526,14 @@ void displayApiCallback(const display_node::DisplayOutput::ConstPtr& msg)
    // Now send data to the display
 
    switch (msg->actionType) {
-     case display_node::DisplayOutput::DISPLAY_STARTUP_STRING:
+     case oled_display_node::DisplayOutput::DISPLAY_STARTUP_STRING:
        displaySetStartupString(msg->row, msg->text.c_str(), i2cSemLockId);
        break;
-     case display_node::DisplayOutput::DISPLAY_SET_BRIGHTNESS:
+     case oled_display_node::DisplayOutput::DISPLAY_SET_BRIGHTNESS:
        displaySetBrightness(msg->attributes, i2cSemLockId);
        break;
-     case display_node::DisplayOutput::DISPLAY_ALL:
-     case display_node::DisplayOutput::DISPLAY_SUBSTRING:
+     case oled_display_node::DisplayOutput::DISPLAY_ALL:
+     case oled_display_node::DisplayOutput::DISPLAY_SUBSTRING:
        displayUpdate(msg->text.c_str(), msg->attributes, msg->row, msg->column, msg->numChars, i2cSemLockId);
        break;
      default:
@@ -543,7 +543,7 @@ void displayApiCallback(const display_node::DisplayOutput::ConstPtr& msg)
 
 int main(int argc, char **argv)
 {
-   printf("ROS Node starting display_node:%s \n", THIS_NODE_NAME);
+   printf("ROS Node starting:%s \n", THIS_NODE_NAME);
 
   // The ros::init() function initializes ROS and needs to see argc and argv
   ros::init(argc, argv, THIS_NODE_NAME);

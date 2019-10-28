@@ -32,7 +32,7 @@ Example client program for writing to display using ROS topic
 import rospy
 
 # our custom messages for the commands we will follow
-from display_node.msg import DisplayOutput
+from oled_display_node.msg import DisplayOutput
 
 import traceback
 import time

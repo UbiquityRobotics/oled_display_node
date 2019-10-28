@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(display_node)
+project(oled_display_node)
+
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -91,22 +92,22 @@ include_directories(
 #)
 
 ## Declare a cpp library
-# add_library(display_node
-#   src/${PROJECT_NAME}/display_node.cpp
+# add_library(oled_display_node
+#   src/${PROJECT_NAME}/oled_display_node.cpp
 # )
 
 ## Declare a cpp executable
-add_executable(display_node src/display_node.cpp)
+add_executable(oled_display_node src/oled_display_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(display_node 
+target_link_libraries(oled_display_node 
     ${catkin_LIBRARIES}
 )
 
-add_dependencies(display_node display_node_generate_messages_cpp)
+add_dependencies(oled_display_node oled_display_node_generate_messages_cpp)
 
 #############
 ## Install ##
@@ -123,7 +124,7 @@ install(PROGRAMS
 )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS display_node
+install(TARGETS oled_display_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
