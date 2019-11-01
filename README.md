@@ -26,6 +26,11 @@ The difference is mostly at initialization and then changing the pixel X offset 
 
 * `oled_display_node` (msgs/DisplayOutput): Listen for display updates
 
+### The Qualified OLED Display we have Tested 
+
+There are several displays that are 1.3" displays using the SH1106 controller that will allow powering from 3.3V and also allow a 3.3V I2C bus.  The pinout MUST be from left to right:   Ground, 3.3V (Vcc), SCL and SDA.
+Sometimes this display is incorrectly stating the controller is a SSH1106 display but it is a point of confusion and is the SH1106.    We have identified a specific vendor as well.   You may purchase this display on amazon.com and look for this text in the title 'HiLetgo 1.3" IIC I2C Serial 128x64 SSH1106 OLED LCD Display LCD Module'.  there are cheaper solutions but only by a few dollars so we wish to only stand behind this display officially.  We claim support for this display on the rev 5.1 motor controller board and this display will plug right in to our female connector on the rev 5.1 board.   The Rev 5.0 controller used a male pin jack so you would have to modify your display with a female socket to use on a rev 5.0 board. 
+
 ### Manually Launching the Node
 
 * roslaunch oled_display_node display.launch
@@ -34,7 +39,9 @@ The node will start and then print the linux network name on top line and then t
 
 ### Launching the Node From a ROS launch file
 
-To launch the node from a ROS launch file add to the launch file these lines:
+To launch the node from a ROS launch file add to the launch file the 2 lines shown below.
+As an example you can add these two line to an Ubiquity Robotics Magni host processor 
+in the file /opt/ros/kinetic/share/magni_bringup/launch/core.launch although we plan on configurable support in early 2020.
 
     <node pkg="oled_display_node" type="oled_display_node" name="oled_display_node" output="screen">
     </node>
