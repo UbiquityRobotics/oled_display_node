@@ -558,18 +558,38 @@ int main(int argc, char **argv)
   std::string firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
 
   char dispBuf[32];
-  dispCtx_t oledDisplayCtx;
-  dispOled_init(OLED_I2C_DEVICE, &oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
-  dispOled_clearDisplay(&oledDisplayCtx);
-  dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
-  dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+  int  dispInitError = 0;
 
-  ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
-  ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
+  dispCtx_t oledDisplayCtx;
+  dispInitError = dispOled_init(OLED_I2C_DEVICE, &oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
+
+  if (dispInitError == 0) {
+      dispOled_clearDisplay(&oledDisplayCtx);
+      dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
+      dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+
+      ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
+      ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
       ROS_TOPIC_DISPLAY_NODE, "DisplayOutput" );
+  } else {
+      ROS_WARN("%s: Display did not initialize properly and will not be used! ", THIS_NODE_NAME);
+  }
 
   // Set to subscribe to the display topic and we then get callbacks for each message
   ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 1000, displayApiCallback);
+
+  // We will refresh the lines from time to time in case IP addr has changed
+  ros::Rate loop_rate(0.1);
+
+  // mainloop:
+  while ((dispInitError == 0) && ros::ok())
+  {
+    dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
+    dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+
+    ros::spinOnce();
+    loop_rate.sleep();
+  }
 
   // ros::spin() will enter a loop allowing callbacks to happen. Exits on Ctrl-C
   ros::spin();
