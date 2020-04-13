@@ -166,7 +166,7 @@ static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
 
 /*
  * @name                dispOled_writeBytes
-/*
+ *
  * @name                display_setCursor
  * @brief               Move cursor to a given horizontal column and line
  *
