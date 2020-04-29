@@ -2,8 +2,8 @@
 Changelog for package oled_display_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.0 (2020-04-28)
+------------------
 * Remove /* in comment that can cause warnings
   Bug: https://github.com/UbiquityRobotics/oled_display_node/issues/4
 * Refresh the IP addr and machine name lines every 10 seconds.  This allows for a changed IP address due to networking changes to show up worse case in 10 seconds.  Any other lines the app outside of the oled display driver is concerned must be refreshed by sending messages to the display node over the input topic as this auto-refresh does not want to make assumptions about user lines in use on the display
