@@ -39,6 +39,11 @@
 
 #define  THIS_NODE_NAME    "oled_display_node"        // The Name for this ROS node. Used in ROS_INFO and more
 
+// Default lines to output text to from this module
+#define  DISP_LINE_HOSTNAME    0
+#define  DISP_LINE_IP_ADDR     1
+#define  DISP_LINE_BATT_VOLTS  3
+
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
 // The 0.96" OLED display tends to use the SSD1306 controller.
@@ -97,6 +102,10 @@
 #include <oled_display_node/font8x8_basic.h>
 
 #include <oled_display_node/DisplayOutput.h>
+#include <sensor_msgs/BatteryState.h>
+
+// Some limited state for display
+double g_batteryVoltage = 0.0;
 
 // External Defs which we keep hidden in this node
 extern  int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars);
@@ -513,7 +522,7 @@ int displaySetBrightness(int brightness, int semLock)
 }
 
 /**
- * Receive mmessages for display output
+ * Receive messages for display output
  */
 void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
 {
@@ -541,6 +550,23 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
    }
 }
 
+
+/**
+ * Receive messages for battery state
+ */
+void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
+{
+  int i2cSemLockId = -9;
+
+  ROS_INFO("%s heard BatteryState msg: with voltage of %f]", THIS_NODE_NAME, msg->voltage);
+
+  g_batteryVoltage = msg->voltage;
+
+}
+
+
+
+
 int main(int argc, char **argv)
 {
    printf("ROS Node starting:%s \n", THIS_NODE_NAME);
@@ -565,8 +591,8 @@ int main(int argc, char **argv)
 
   if (dispInitError == 0) {
       dispOled_clearDisplay(&oledDisplayCtx);
-      dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
-      dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+      dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, 1, hostname.c_str());
+      dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, 1, firstIpAddress.c_str());
 
       ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
       ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
@@ -578,14 +604,24 @@ int main(int argc, char **argv)
   // Set to subscribe to the display topic and we then get callbacks for each message
   ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 1000, displayApiCallback);
 
+  // Set to subscribe to the battery_state topic and we then get callbacks for each message
+  ros::Subscriber sub2 = nh.subscribe("battery_state", 1000, batteryStateApiCallback);
+
+
   // We will refresh the lines from time to time in case IP addr has changed
   ros::Rate loop_rate(0.1);
 
   // mainloop:
   while ((dispInitError == 0) && ros::ok())
   {
-    dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
-    dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+    dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, 1, hostname.c_str());
+    dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, 1, firstIpAddress.c_str());
+
+    std::string battText;
+    std::stringstream stream;
+    stream << std::fixed << std::setprecision(2) << g_batteryVoltage;
+    battText = "BattV: " + stream.str();
+    dispOled_writeText(&oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, 1, battText.c_str());
 
     ros::spinOnce();
     loop_rate.sleep();
