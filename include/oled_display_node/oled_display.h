@@ -73,6 +73,7 @@ typedef struct {
 #define OLED_CMD_DISPLAY_ALLON          0xA5
 #define OLED_CMD_DISPLAY_NORMAL         0xA6
 #define OLED_CMD_DISPLAY_INVERTED       0xA7
+#define OLED_CMD_DC_DC_CTRL_MODE        0xAD    // Must have display off and must follow this with 0x8B
 #define OLED_CMD_DISPLAY_OFF            0xAE
 #define OLED_CMD_DISPLAY_ON             0xAF
 
