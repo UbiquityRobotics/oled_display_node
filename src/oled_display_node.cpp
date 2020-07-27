@@ -638,10 +638,9 @@ int main(int argc, char **argv)
     // If there is a battery_state topic and we get the callback also show battery voltage
     if (g_batteryVoltage > 0.0) {
         ROS_INFO("%s Battery voltage is now %5.2f volts.", THIS_NODE_NAME, g_batteryVoltage);
-        std::string battText;
         std::stringstream stream;
         stream << std::fixed << std::setprecision(2) << g_batteryVoltage;
-        battText = "BattV: " + stream.str();
+        std::string battText = "BattV: " + stream.str();
         dispOled_writeText(&oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, DISP_TEXT_START_MODE, battText.c_str());
         ros::Duration(updateDelay).sleep();
     }
