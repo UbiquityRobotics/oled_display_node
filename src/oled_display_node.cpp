@@ -39,6 +39,11 @@
 
 #define  THIS_NODE_NAME    "oled_display_node"        // The Name for this ROS node. Used in ROS_INFO and more
 
+// Default lines to output text to from this module
+#define  DISP_LINE_HOSTNAME    0
+#define  DISP_LINE_IP_ADDR     1
+#define  DISP_LINE_BATT_VOLTS  3
+
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
 // The 0.96" OLED display tends to use the SSD1306 controller.
@@ -49,6 +54,12 @@
 #define OLED_DISPLAY_TYPE  DISPLAY_TYPE_SH1106
 #define OLED_DISPLAY_ADDR  SH1106_OLED_I2C_ADDRESS
 #define OLED_I2C_DEVICE    "/dev/i2c-1"          // SYSTEM SPECIFIC
+
+// High level API defines to better document calls
+#define DISP_WRITE_TEXT_CENTER      1
+#define DISP_WRITE_TEXT_LEFT        0
+#define DISP_TEXT_START_MODE    DISP_WRITE_TEXT_CENTER     // The default mode used for common writes
+
 
 /************************************************************************************
  * The ROS Code usage requires the following comments be pressent:
@@ -97,6 +108,10 @@
 #include <oled_display_node/font8x8_basic.h>
 
 #include <oled_display_node/DisplayOutput.h>
+#include <sensor_msgs/BatteryState.h>
+
+// Some limited state for display
+double g_batteryVoltage = 0.0;
 
 // External Defs which we keep hidden in this node
 extern  int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars);
@@ -153,14 +168,20 @@ static uint8_t ssd1306_init_bytes[SSD1306_INIT_BYTE_COUNT] = {
                 OLED_CMD_DISPLAY_ON
 };
 
-#define SH1106_INIT_BYTE_COUNT  8
+#define SH1106_INIT_BYTE_COUNT  17
 static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
         OLED_CONTROL_BYTE_CMD_STREAM,
                 0x30,                           // Charge pump default
                 0x40,                           // RAM display line of 0
+                OLED_CMD_DISPLAY_OFF,
                 OLED_CMD_SET_SEGMENT_REMAP,
                 OLED_CMD_SET_COM_SCAN_MODE,
+                OLED_CMD_SET_DISPLAY_OFFSET, 0, // Sets mapping of display start line 
+                OLED_CMD_DC_DC_CTRL_MODE, 0x8B, // Must have DISPLAY_OFF and follow tih 0x8B
                 0x81, 0x80,         // Display contrast set to second byte
+                OLED_CMD_DISPLAY_RAM,
+                OLED_CMD_DISPLAY_NORMAL,
+                OLED_CMD_SET_MUX_RATIO, 0x3F,   // Init multiplex ration to standard value
                 OLED_CMD_DISPLAY_ON
 };
 
@@ -330,8 +351,8 @@ int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
                 // SH1106 has different addressing than SSD1306
                 curserSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
                 curserSetup[1] = 0xB0 | (line & 0xf);
-                curserSetup[2] = 0x00 | ((column + dispCtx->horzOffset) & 0xf);     // Lower column address
-                curserSetup[3] = 0x10 | ((column + dispCtx->horzOffset) >> 4);      // Upper column address
+                curserSetup[2] = 0x10 | (((column + dispCtx->horzOffset) & 0xf0) >> 4);  // Upper column address
+                curserSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
                 retCode = dispOled_writeBytes(dispCtx, &curserSetup[0], 4);
@@ -486,7 +507,7 @@ int  displayUpdate(std::string text, int attributes, int row, int column, int nu
   charBuf[lineChars] = 0;
 
   // Write out the characters to the display
-  dispOled_writeText(&oledDisplayCtx, dispRow, segment, 0, &charBuf[0]);
+  dispOled_writeText(&oledDisplayCtx, dispRow, segment, DISP_TEXT_START_MODE, &charBuf[0]);
 
   return 0;
 }
@@ -513,7 +534,7 @@ int displaySetBrightness(int brightness, int semLock)
 }
 
 /**
- * Receive mmessages for display output
+ * Receive messages for display output
  */
 void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
 {
@@ -541,9 +562,25 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
    }
 }
 
+
+/**
+ * Receive messages for battery state
+ */
+void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
+{
+  int i2cSemLockId = -9;
+
+  g_batteryVoltage = msg->voltage;
+
+}
+
+
+
+
 int main(int argc, char **argv)
 {
-   printf("ROS Node starting:%s \n", THIS_NODE_NAME);
+  double updateDelay = 0.25;
+  printf("ROS Node starting:%s \n", THIS_NODE_NAME);
 
   // The ros::init() function initializes ROS and needs to see argc and argv
   ros::init(argc, argv, THIS_NODE_NAME);
@@ -565,8 +602,11 @@ int main(int argc, char **argv)
 
   if (dispInitError == 0) {
       dispOled_clearDisplay(&oledDisplayCtx);
-      dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
-      dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+      ros::Duration(1.0).sleep();
+      dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+      ros::Duration(updateDelay).sleep();
+      dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+      ros::Duration(updateDelay).sleep();
 
       ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
       ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
@@ -578,14 +618,32 @@ int main(int argc, char **argv)
   // Set to subscribe to the display topic and we then get callbacks for each message
   ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 1000, displayApiCallback);
 
+  // Set to subscribe to the battery_state topic and we then get callbacks for each message
+  ros::Subscriber sub2 = nh.subscribe("battery_state", 1000, batteryStateApiCallback);
+
+
   // We will refresh the lines from time to time in case IP addr has changed
   ros::Rate loop_rate(0.1);
 
   // mainloop:
   while ((dispInitError == 0) && ros::ok())
   {
-    dispOled_writeText(&oledDisplayCtx, 0, 0, 1, hostname.c_str());
-    dispOled_writeText(&oledDisplayCtx, 2, 0, 1, firstIpAddress.c_str());
+    hostname = getPopen("uname -n");
+    firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
+    dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+    ros::Duration(updateDelay).sleep();
+    dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+    ros::Duration(updateDelay).sleep();
+
+    // If there is a battery_state topic and we get the callback also show battery voltage
+    if (g_batteryVoltage > 0.0) {
+        ROS_INFO("%s Battery voltage is now %5.2f volts.", THIS_NODE_NAME, g_batteryVoltage);
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(2) << g_batteryVoltage;
+        std::string battText = "BattV: " + stream.str();
+        dispOled_writeText(&oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, DISP_TEXT_START_MODE, battText.c_str());
+        ros::Duration(updateDelay).sleep();
+    }
 
     ros::spinOnce();
     loop_rate.sleep();
