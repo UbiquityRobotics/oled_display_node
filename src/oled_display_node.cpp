@@ -51,7 +51,7 @@
 // RAM space is 132*64, while SSD1306 space is 128*64.
 // This code supports the 1.3" OLED with the SH1106 controller chip by default
 // So besides different initialization bytes the display starts 2 bytes later in one vs the other
-#define OLED_DISPLAY_TYPE  DISPLAY_TYPE_SH1106
+#define OLED_DISPLAY_TYPE  DISPLAY_TYPE_AUTO     // Or it can be forced ie DISPLAY_TYPE_SH1106
 #define OLED_DISPLAY_ADDR  SH1106_OLED_I2C_ADDRESS
 #define OLED_I2C_DEVICE    "/dev/i2c-1"          // SYSTEM SPECIFIC
 
@@ -113,8 +113,12 @@
 // Some limited state for display
 double g_batteryVoltage = 0.0;
 
+// Display context 
+dispCtx_t g_oledDisplayCtx;
+
 // External Defs which we keep hidden in this node
 extern  int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars);
+extern  int dispOled_detectDisplayType(std::string devName, uint8_t i2cAddr);
 extern  int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr);
 extern  int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr);
 extern  int dispOled_clearDisplay(dispCtx_t *dispCtx);
@@ -243,6 +247,110 @@ int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars)
 }
 
 /*
+ * @name                i2c_BufferRead
+ * @brief               Read one or more bytes from an I2C based device
+ *
+ * @param               i2cDevFile      Name of the I2C device
+ * @param               i2c7bitAddr     7-bit I2C bus address
+ * @param               pBuffer         User 8-bit buffer for data return
+ * @param               chipRegAddr     Address register within chip. Use < 0 to suppress reg addr
+ * @param               numBytes        Number of bytes to be read from the chip
+ *
+ * @return              Returns number of bytes read where 0 or less implies some form of failure
+ */
+static int i2c_BufferRead(const char *i2cDevFile, uint8_t i2c7bitAddr, 
+                          uint8_t *pBuffer, int16_t chipRegAddr, uint16_t numBytes)
+{
+   int bytesRead = 0;
+   int retCode   = 0;
+
+    int fd;                                         // File descrition
+    int  address   = i2c7bitAddr;                   // Address of the I2C device
+    uint8_t buf[8];                                 // Buffer for data being written to the i2c device
+
+    if ((fd = open(i2cDevFile, O_RDWR)) < 0) {      // Open port for reading and writing
+      retCode = -2;
+      ROS_ERROR("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
+      goto exitWithNoClose;
+    }
+
+    // The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
+    if (ioctl(fd, I2C_SLAVE, address) != 0) {        // Set the port options and addr of the dev
+      retCode = -3;
+      ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+      goto exitWithFileClose;
+    }
+
+    if (chipRegAddr < 0) {     // Suppress reg address if negative value was used
+      buf[0] = (uint8_t)(chipRegAddr);          // Internal chip register address
+      if ((write(fd, buf, 1)) != 1) {           // Write both bytes to the i2c port
+        retCode = -4;
+        goto exitWithFileClose;
+      }
+    }
+
+    bytesRead = read(fd, pBuffer, numBytes);
+    if (bytesRead != numBytes) {      // verify the number of bytes we requested were read
+      retCode = -9;
+      goto exitWithFileClose;
+    }
+    retCode = bytesRead;
+
+  exitWithFileClose:
+    close(fd);
+
+  exitWithNoClose:
+
+  return retCode;
+}
+
+/*
+ * @name                dispOled_detectDisplayType
+ * @brief               Determine display type or if it is on the I2C bus
+ *
+ * @param               devName         Name of the I2C output device
+ * @param               i2c7bitAddr     7-bit I2C bus address
+ *
+ * @return              dispType        DISPLAY_TYPE_SSD1306,DISPLAY_TYPE_SH1106
+ * @return              Returns DISPLAY_TYPE_SH1106 [DEFAULT] or DISPLAY_TYPE_SSD1306
+ *                      Returns DISPLAY_TYPE_NONE for I2C error due to no device detected
+ */
+#define MX_DEV_NAME_LEN 32
+int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *dispType)
+{
+    uint8_t buf[16];
+    int     retCode = 0;
+    char    device[MX_DEV_NAME_LEN]; 
+    strncpy(&device[0], devName.c_str(), MX_DEV_NAME_LEN);
+    device[(MX_DEV_NAME_LEN-1)] = 0;     // protect against long dev names
+
+    // Read the status register at chip addr 0 to decide on chip type
+    int retCount = i2c_BufferRead(&device[0], i2c7bitAddr, &buf[0], 0, 1);
+    if (retCount < 0) {
+        ROS_ERROR("Error %d in reading OLED status register at 7bit I2CAddr 0x%x", 
+            retCount, i2c7bitAddr);
+        *dispType = DISPLAY_TYPE_NONE;
+        retCode = retCount;
+    } else if (retCount != 1) {
+        ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x", 
+            i2c7bitAddr);
+        *dispType = DISPLAY_TYPE_NONE;
+        retCode = -1;
+    } else {
+        ROS_INFO("Read OLED status register as 0x%02x", buf[0]);
+        if ((buf[0] & 0x07) == 0x06) {
+            // We found lower 3 bit as a 6 but datasheet does not spec it
+            *dispType = DISPLAY_TYPE_SSD1306;
+        } else {
+            // Data sheet guarentees lower 3 bits as 0
+            // We are going to assume this type if SSD1306 was not detected
+            *dispType = DISPLAY_TYPE_SH1106;
+        }
+    }
+    return retCode;
+}
+
+/*
  * @name                dispOled_initCtx
  * @brief               Initialize a display context
  *
@@ -292,14 +400,24 @@ int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispType, uint
  *
  * @param               devName         Name of the I2C output device
  * @param               dispCtx         Context for display that this command will populate
- * @param               dispType        Type of display. DISPLAY_TYPE_SSD1306 or DISPLAY_TYPE_SH1106
+ * @param               displayType     Type of display. DISPLAY_TYPE_SSD1306 or DISPLAY_TYPE_SH1106
  * @param               i2cAddr         7-bit I2C bus address
  *
- * @return              Returns 0 for ok or -1 for IO error
+ * @return              Returns 0 for ok or negative for IO error
  */
-int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr)
+int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint8_t i2cAddr)
 {
     int retCode = 0;
+    int dispType = displayType;
+
+    // If this is called with NONE we try to autodetect the display
+    if (dispType == DISPLAY_TYPE_NONE) {
+        // Auto-detect display. Detects if display present and type of OLED display
+        retCode = dispOled_detectDisplayType(devName, i2cAddr, &dispType);
+        if (retCode != 0) {
+            return retCode;
+        }
+    }
 
     dispOled_initCtx(devName, dispCtx, dispType, i2cAddr);
 
@@ -307,17 +425,19 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t
     switch (dispCtx->dispType) {
     case DISPLAY_TYPE_SSD1306:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode = dispOled_writeBytes(dispCtx, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
+        printf("%s:  Setup for SSD1306 controller on the OLED display\n", THIS_NODE_NAME);
+        retCode = dispOled_writeBytes(dispCtx, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
         break;
     case DISPLAY_TYPE_SH1106:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode = dispOled_writeBytes(dispCtx, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
+        printf("%s:  Setup for SH1106 controller on the OLED display\n", THIS_NODE_NAME);
+        retCode = dispOled_writeBytes(dispCtx, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
         break;
     default:
         retCode = -9;
         break;
     }
-        return retCode;
+    return retCode;
 }
 
 /*
@@ -486,18 +606,18 @@ int  displayUpdate(std::string text, int attributes, int row, int column, int nu
 
   ROS_INFO("%s: Write '%s' to row %d and column %d\n", THIS_NODE_NAME, text.c_str(), row, column);
 
-  dispCtx_t oledDisplayCtx;
+  dispCtx_t oledDispCtx;
   char charBuf[120];
   int segment = column * DISPLAY_CHAR_WIDTH;
   int dispRow  = row;   // Bypass the system info area
-  int maxChars = oledDisplayCtx.maxColumn - 1;
+  int maxChars = oledDispCtx.maxColumn - 1;
   int lineChars = messageLength;
 
   // We only initialize display context and do not re-initialize actual display
-  dispOled_initCtx(OLED_I2C_DEVICE, &oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
+  dispOled_initCtx(OLED_I2C_DEVICE, &oledDispCtx, g_oledDisplayCtx.dispType, OLED_DISPLAY_ADDR);
 
   // Would be nice to account for non-zero cursor due to cursor control sometime too ...
-  if (messageLength > oledDisplayCtx.maxColumn) {
+  if (messageLength > oledDispCtx.maxColumn) {
     ROS_ERROR("%s: Unsupported character count of %d\n", THIS_NODE_NAME, messageLength);
     return -9;
   }
@@ -507,7 +627,7 @@ int  displayUpdate(std::string text, int attributes, int row, int column, int nu
   charBuf[lineChars] = 0;
 
   // Write out the characters to the display
-  dispOled_writeText(&oledDisplayCtx, dispRow, segment, DISP_TEXT_START_MODE, &charBuf[0]);
+  dispOled_writeText(&oledDispCtx, dispRow, segment, DISP_TEXT_START_MODE, &charBuf[0]);
 
   return 0;
 }
@@ -538,7 +658,7 @@ int displaySetBrightness(int brightness, int semLock)
  */
 void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
 {
-  ROS_DEBUG("%s heard display output msg: of actionType %d row %d column %d numChars %d attr 0x%x text %s comment %s]",
+  ROS_INFO("%s heard display output msg: of actionType %d row %d column %d numChars %d attr 0x%x text %s comment %s]",
                 THIS_NODE_NAME, msg->actionType, msg->row, msg->column, msg->numChars, msg->attributes,
                 msg->text.c_str(), msg->comment.c_str());
 
@@ -597,15 +717,16 @@ int main(int argc, char **argv)
   char dispBuf[32];
   int  dispInitError = 0;
 
-  dispCtx_t oledDisplayCtx;
-  dispInitError = dispOled_init(OLED_I2C_DEVICE, &oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
+  printf("%s:  Initialize OLED display\n", THIS_NODE_NAME);
+  dispInitError = dispOled_init(OLED_I2C_DEVICE, &g_oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
+  printf("%s:  OLED display initialized\n", THIS_NODE_NAME);
 
   if (dispInitError == 0) {
-      dispOled_clearDisplay(&oledDisplayCtx);
+      dispOled_clearDisplay(&g_oledDisplayCtx);
       ros::Duration(1.0).sleep();
-      dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
       ros::Duration(updateDelay).sleep();
-      dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
       ros::Duration(updateDelay).sleep();
 
       ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
@@ -630,9 +751,9 @@ int main(int argc, char **argv)
   {
     hostname = getPopen("uname -n");
     firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
-    dispOled_writeText(&oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+    dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
     ros::Duration(updateDelay).sleep();
-    dispOled_writeText(&oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+    dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
     ros::Duration(updateDelay).sleep();
 
     // If there is a battery_state topic and we get the callback also show battery voltage
@@ -641,7 +762,7 @@ int main(int argc, char **argv)
         std::stringstream stream;
         stream << std::fixed << std::setprecision(2) << g_batteryVoltage;
         std::string battText = "BattV: " + stream.str();
-        dispOled_writeText(&oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, DISP_TEXT_START_MODE, battText.c_str());
+        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, DISP_TEXT_START_MODE, battText.c_str());
         ros::Duration(updateDelay).sleep();
     }
 
