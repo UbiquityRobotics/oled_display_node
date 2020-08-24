@@ -411,7 +411,7 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint
     int dispType = displayType;
 
     // If this is called with NONE we try to autodetect the display
-    if (dispType == DISPLAY_TYPE_NONE) {
+    if (dispType == DISPLAY_TYPE_AUTO) {
         // Auto-detect display. Detects if display present and type of OLED display
         retCode = dispOled_detectDisplayType(devName, i2cAddr, &dispType);
         if (retCode != 0) {
@@ -425,12 +425,12 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint
     switch (dispCtx->dispType) {
     case DISPLAY_TYPE_SSD1306:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-        printf("%s:  Setup for SSD1306 controller on the OLED display\n", THIS_NODE_NAME);
+        ROS_INFO("%s Setup for SSD1306 controller on the OLED display.", THIS_NODE_NAME);
         retCode = dispOled_writeBytes(dispCtx, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
         break;
     case DISPLAY_TYPE_SH1106:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-        printf("%s:  Setup for SH1106 controller on the OLED display\n", THIS_NODE_NAME);
+        ROS_INFO("%s Setup for SH1106 controller on the OLED display.", THIS_NODE_NAME);
         retCode = dispOled_writeBytes(dispCtx, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
         break;
     default:
@@ -700,13 +700,14 @@ void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
 int main(int argc, char **argv)
 {
   double updateDelay = 0.25;
-  printf("ROS Node starting:%s \n", THIS_NODE_NAME);
 
   // The ros::init() function initializes ROS and needs to see argc and argv
   ros::init(argc, argv, THIS_NODE_NAME);
 
   // Setup a NodeHandle for the main access point to communications with the ROS system.
   ros::NodeHandle nh;
+
+  ROS_INFO("%s OLED Display node starting.", THIS_NODE_NAME);
 
   // Get our hostname on the network
   std::string hostname = getPopen("uname -n");
@@ -717,9 +718,9 @@ int main(int argc, char **argv)
   char dispBuf[32];
   int  dispInitError = 0;
 
-  printf("%s:  Initialize OLED display\n", THIS_NODE_NAME);
+  ROS_INFO("%s Initialize OLED display.", THIS_NODE_NAME);
   dispInitError = dispOled_init(OLED_I2C_DEVICE, &g_oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
-  printf("%s:  OLED display initialized\n", THIS_NODE_NAME);
+  ROS_INFO("%s OLED display initialized.", THIS_NODE_NAME);
 
   if (dispInitError == 0) {
       dispOled_clearDisplay(&g_oledDisplayCtx);
@@ -733,7 +734,8 @@ int main(int argc, char **argv)
       ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
       ROS_TOPIC_DISPLAY_NODE, "DisplayOutput" );
   } else {
-      ROS_WARN("%s: Display did not initialize properly and will not be used! ", THIS_NODE_NAME);
+      ROS_ERROR("%s: Display did not initialize properly and will not be used! ", THIS_NODE_NAME);
+      return 0;
   }
 
   // Set to subscribe to the display topic and we then get callbacks for each message
