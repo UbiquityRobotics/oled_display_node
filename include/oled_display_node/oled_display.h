@@ -15,6 +15,7 @@
 
 
 #define DISPLAY_TYPE_NONE         0
+#define DISPLAY_TYPE_AUTO         0
 #define DISPLAY_TYPE_SSD1306      1    // 0.96" 128x64
 #define DISPLAY_TYPE_SH1106       2    // 1.3" diagonal 128x64
 
