@@ -281,7 +281,7 @@ static int i2c_BufferRead(const char *i2cDevFile, uint8_t i2c7bitAddr,
       goto exitWithFileClose;
     }
 
-    if (chipRegAddr < 0) {     // Suppress reg address if negative value was used
+    if (chipRegAddr >= 0) {     // Only write reg address if negative value was used
       buf[0] = (uint8_t)(chipRegAddr);          // Internal chip register address
       if ((write(fd, buf, 1)) != 1) {           // Write both bytes to the i2c port
         retCode = -4;
