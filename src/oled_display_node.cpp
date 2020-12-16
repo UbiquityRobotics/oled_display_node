@@ -44,6 +44,10 @@
 #define  DISP_LINE_IP_ADDR     1
 #define  DISP_LINE_BATT_VOLTS  3
 
+// We are putting a battery low blinking in here but this logic should really be
+// located in motor node so this is temporary feature
+#define  BAT_LOW_LEVEL  23.0                     // Start to warn of low battery voltage with blinking display
+
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
 // The 0.96" OLED display tends to use the SSD1306 controller.
@@ -746,11 +750,13 @@ int main(int argc, char **argv)
 
 
   // We will refresh the lines from time to time in case IP addr has changed
-  ros::Rate loop_rate(0.1);
+  ros::Rate loop_rate(0.5);
+  int32_t loopIdx = 0;
 
   // mainloop:
   while ((dispInitError == 0) && ros::ok())
   {
+    loopIdx++;
     hostname = getPopen("uname -n");
     firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
     dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
@@ -760,11 +766,20 @@ int main(int argc, char **argv)
 
     // If there is a battery_state topic and we get the callback also show battery voltage
     if (g_batteryVoltage > 0.0) {
-        ROS_INFO("%s Battery voltage is now %5.2f volts.", THIS_NODE_NAME, g_batteryVoltage);
+        ROS_INFO("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
         std::stringstream stream;
-        stream << std::fixed << std::setprecision(2) << g_batteryVoltage;
-        std::string battText = "BattV: " + stream.str();
-        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 0, DISP_TEXT_START_MODE, battText.c_str());
+        stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
+        if (g_batteryVoltage >= BAT_LOW_LEVEL) {
+            stream << " OK  ";
+        } else {
+          if ((loopIdx & 1) == 0) { 
+              stream << " LOW ";
+          } else {
+              stream << "    ";
+          }
+        }
+        std::string battText = "Bat " + stream.str();
+        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
         ros::Duration(updateDelay).sleep();
     }
 
