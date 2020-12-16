@@ -29,6 +29,20 @@
  *
  */
 
+// This ensures that the code is ran on Raspberry Pi architecture
+#ifdef __x86_64__
+
+#include <stdio.h>
+
+int main(int argc, char** argv) {
+    (void)fprintf(stderr, "The oled_display_node for the x86/64 is a fake!\n");
+    return 1;
+}
+
+#endif // __x86_64__
+
+#if defined(__arm__) || defined(__aarch64__)
+
 /*
  * Display Output Subsystem
  *
@@ -99,6 +113,7 @@
 
 // These next few are for I2C and ioctls and file opens
 #include <linux/i2c-dev.h>
+#include <linux/i2c.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -117,17 +132,16 @@
 // Some limited state for display
 double g_batteryVoltage = 0.0;
 
-// Display context 
+// Display context
 dispCtx_t g_oledDisplayCtx;
 
 // External Defs which we keep hidden in this node
-extern  int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars);
 extern  int dispOled_detectDisplayType(std::string devName, uint8_t i2cAddr);
 extern  int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr);
 extern  int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr);
 extern  int dispOled_clearDisplay(dispCtx_t *dispCtx);
 extern  int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line);
-extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, 
+extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment,
                 uint8_t center, const char *textStr);
 
 /*
@@ -184,7 +198,7 @@ static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
                 OLED_CMD_DISPLAY_OFF,
                 OLED_CMD_SET_SEGMENT_REMAP,
                 OLED_CMD_SET_COM_SCAN_MODE,
-                OLED_CMD_SET_DISPLAY_OFFSET, 0, // Sets mapping of display start line 
+                OLED_CMD_SET_DISPLAY_OFFSET, 0, // Sets mapping of display start line
                 OLED_CMD_DC_DC_CTRL_MODE, 0x8B, // Must have DISPLAY_OFF and follow tih 0x8B
                 0x81, 0x80,         // Display contrast set to second byte
                 OLED_CMD_DISPLAY_RAM,
@@ -194,118 +208,122 @@ static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
 };
 
 /*
- * @name                dispOled_writeBytes
- *
- * @name                display_setCursor
- * @brief               Move cursor to a given horizontal column and line
- *
- * @param               dispCtx         Context for display that holds type and hardware interface info
- * @param               column          The pixel resolution column from 0 to 127
- * @param               line            The line number where 0 is top line
- *
- * @return              Returns 0 for ok or -1 for IO error
- *
- * @note        Caller is responsible for use of i2c_lock() and i2c_unlock() outside of this call
- */
-int dispOled_writeBytes(dispCtx_t *dispCtx, uint8_t *outBuf, int numChars)
-{
-    int           fd;                                // File descrition
-    const char    *fileName = &dispCtx->devName[0];  // Name of the port we will be using
-    int           address   = dispCtx->i2cAddr;      // Address of the Modtronixs LCD display
-
-    // Check that the display context seems reasonable and initialized
-    if (dispCtx == NULL) {
-        ROS_ERROR("%s: Write to OLED display with bad context\n", THIS_NODE_NAME);
-        return -1;
-    }
-    switch (dispCtx->dispType) {
-        case DISPLAY_TYPE_SSD1306:
-        case DISPLAY_TYPE_SH1106:
-            break;
-        default:
-            ROS_ERROR("%s: Write to OLED display with bad OLED display type\n", THIS_NODE_NAME);
-            return -1;
-            break;
-    }
-
-    if ((fd = open(fileName, O_RDWR)) < 0) {      // Open port for reading and writing
-        ROS_ERROR("%s: Unable to open I2C device to talk to slave\n", THIS_NODE_NAME);
-        return -2;
-    }
-
-    if (ioctl(fd, I2C_SLAVE, address) < 0) {      // Set the port options and addr of the dev
-        ROS_ERROR("%s: Unable to get bus access to talk to slave\n", THIS_NODE_NAME);
-        close (fd);
-        return -3;
-    }
-    // we are now free to transmit to the I2C port 1 to latch 1
-
-    if ((write(fd, outBuf, numChars)) != numChars) {    // Write commands to the i2c port
-        ROS_ERROR("%s: Error writing proper byte count of %d bytes to i2c slave\n", THIS_NODE_NAME, numChars);
-        close (fd);
-        return -4;
-    }
-    close (fd);
-
-    return 0;
-}
-
-/*
- * @name                i2c_BufferRead
+ * @name                i2c_read
  * @brief               Read one or more bytes from an I2C based device
  *
  * @param               i2cDevFile      Name of the I2C device
  * @param               i2c7bitAddr     7-bit I2C bus address
  * @param               pBuffer         User 8-bit buffer for data return
- * @param               chipRegAddr     Address register within chip. Use < 0 to suppress reg addr
  * @param               numBytes        Number of bytes to be read from the chip
+ * @param               chipRegAddr     Address register within chip. Set chipRegAddr to true if specified
+ * @param               chipRegAddrFlag Set to false to suppress writing to slave internal address
  *
  * @return              Returns number of bytes read where 0 or less implies some form of failure
  */
-static int i2c_BufferRead(const char *i2cDevFile, uint8_t i2c7bitAddr, 
-                          uint8_t *pBuffer, int16_t chipRegAddr, uint16_t numBytes)
+static int i2c_read(const char *i2cDevFile, uint8_t i2c7bitAddr,
+                    uint8_t *pBuffer, int numBytes, uint8_t chipRegAddr, bool chipRegAddrFlag)
 {
-   int bytesRead = 0;
-   int retCode   = 0;
+    int       fd;                                     	  // File descriptor
+    const int slaveAddress = i2c7bitAddr;             	  // Address of the I2C device
+    int       retCode   = 0;
+    int       bytesRead = 0;
+    struct    i2c_msg msgs[2];                    	  // Low level representation of one segment of an I2C transaction
+    struct    i2c_rdwr_ioctl_data msgset[1];	 	  // Set of transaction segments
 
-    int fd;                                         // File descrition
-    int  address   = i2c7bitAddr;                   // Address of the I2C device
-    uint8_t buf[8];                                 // Buffer for data being written to the i2c device
-
-    if ((fd = open(i2cDevFile, O_RDWR)) < 0) {      // Open port for reading and writing
-      retCode = -2;
+    if ((fd = open(i2cDevFile, O_RDWR)) < 0) {   	  // Open port for reading and writing
       ROS_ERROR("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
+      retCode = -1;
+      goto exitWithNoClose;
+    }
+
+    if (chipRegAddrFlag) {
+        msgs[0].addr = slaveAddress;
+        msgs[0].flags = 0;                       	  // Write bit
+        msgs[0].len = 1;                         	  // Slave Address/byte written to I2C slave address
+        msgs[0].buf = &chipRegAddr;              	  // Internal Chip Register Address
+        msgs[1].addr = slaveAddress;
+        msgs[1].flags = I2C_M_RD | I2C_M_NOSTART;	  // Read bit or Combined transaction bit
+        msgs[1].len = numBytes;                  	  // Number of bytes read
+        msgs[1].buf = pBuffer;                   	  // Output read buffer
+
+        msgset[0].msgs = msgs;
+        msgset[0].nmsgs = 2;                     	  // number of transaction segments (write and read)
+
+        // The ioctl here will execute I2C transaction with kernel enforced lock
+        if (ioctl(fd, I2C_RDWR, &msgset) < 0) {
+            ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+            retCode = -2;
+            goto exitWithFileClose;
+        }
+    }
+    else {
+	// The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
+    	if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {    // Set the port options and addr of the dev
+      	  ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+      	  retCode = -3;
+          goto exitWithFileClose;
+    	}
+
+        bytesRead = read(fd, pBuffer, numBytes);
+        if (bytesRead != numBytes) {             	  // Verify that the number of bytes we requested were read
+          ROS_ERROR("Failed to read from I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+          retCode = -9;
+          goto exitWithFileClose;
+        }
+    }
+    retCode = numBytes;
+
+    exitWithFileClose:
+        close(fd);
+
+    exitWithNoClose:
+
+    return retCode;
+}
+
+/*
+ * @name                i2c_write
+ * @brief               Write one or more bytes to the I2C based device
+ *
+ * @param               i2cDevFile       Name of the I2C Device
+ * @param               i2c7bitAddr      7-bit I2C bus address
+ * @param               pBuffer          User 8-bit buffer for data input
+ * @param               numBytes         Number of bytes to be written to the chip
+ *
+ * @return              Returns 0 for ok or less implies some form of failure
+ */
+static int i2c_write(const char *i2cDevFile, uint8_t i2c7bitAddr, uint8_t *pBuffer, int numBytes)
+{
+    int        fd;                 		// File descriptor
+    int        retCode;
+    const int  slaveAddress = i2c7bitAddr;      // Address of the I2C device
+
+    // Open port for writing
+    if ((fd = open(i2cDevFile, O_WRONLY)) < 0) {
+      ROS_ERROR("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
+      retCode = -3;
       goto exitWithNoClose;
     }
 
     // The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
-    if (ioctl(fd, I2C_SLAVE, address) != 0) {        // Set the port options and addr of the dev
-      retCode = -3;
+    if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {  // Set the port options and addr of the dev
       ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+      retCode = -4;
       goto exitWithFileClose;
     }
 
-    if (chipRegAddr < 0) {     // Suppress reg address if negative value was used
-      buf[0] = (uint8_t)(chipRegAddr);          // Internal chip register address
-      if ((write(fd, buf, 1)) != 1) {           // Write both bytes to the i2c port
-        retCode = -4;
+    if (write(fd, pBuffer, numBytes) != numBytes) {
+        ROS_ERROR("Failed to write to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+        retCode = -9;
         goto exitWithFileClose;
-      }
     }
 
-    bytesRead = read(fd, pBuffer, numBytes);
-    if (bytesRead != numBytes) {      // verify the number of bytes we requested were read
-      retCode = -9;
-      goto exitWithFileClose;
-    }
-    retCode = bytesRead;
+    exitWithFileClose:
+        close(fd);
 
-  exitWithFileClose:
-    close(fd);
+    exitWithNoClose:
 
-  exitWithNoClose:
-
-  return retCode;
+    return 0;
 }
 
 /*
@@ -319,24 +337,25 @@ static int i2c_BufferRead(const char *i2cDevFile, uint8_t i2c7bitAddr,
  * @return              Returns DISPLAY_TYPE_SH1106 [DEFAULT] or DISPLAY_TYPE_SSD1306
  *                      Returns DISPLAY_TYPE_NONE for I2C error due to no device detected
  */
+
 #define MX_DEV_NAME_LEN 32
 int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *dispType)
 {
     uint8_t buf[16];
     int     retCode = 0;
-    char    device[MX_DEV_NAME_LEN]; 
+    char    device[MX_DEV_NAME_LEN];
     strncpy(&device[0], devName.c_str(), MX_DEV_NAME_LEN);
     device[(MX_DEV_NAME_LEN-1)] = 0;     // protect against long dev names
 
-    // Read the status register at chip addr 0 to decide on chip type
-    int retCount = i2c_BufferRead(&device[0], i2c7bitAddr, &buf[0], 0, 1);
+    // Read the status register at chip addr 0 to decide on chip type - set flag to true
+    int retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
     if (retCount < 0) {
-        ROS_ERROR("Error %d in reading OLED status register at 7bit I2CAddr 0x%x", 
+        ROS_ERROR("Error %d in reading OLED status register at 7bit I2CAddr 0x%x",
             retCount, i2c7bitAddr);
         *dispType = DISPLAY_TYPE_NONE;
         retCode = retCount;
     } else if (retCount != 1) {
-        ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x", 
+        ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x",
             i2c7bitAddr);
         *dispType = DISPLAY_TYPE_NONE;
         retCode = -1;
@@ -430,12 +449,12 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint
     case DISPLAY_TYPE_SSD1306:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
         ROS_INFO("%s Setup for SSD1306 controller on the OLED display.", THIS_NODE_NAME);
-        retCode = dispOled_writeBytes(dispCtx, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
+        retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
         break;
     case DISPLAY_TYPE_SH1106:
         // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
         ROS_INFO("%s Setup for SH1106 controller on the OLED display.", THIS_NODE_NAME);
-        retCode = dispOled_writeBytes(dispCtx, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
+        retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
         break;
     default:
         retCode = -9;
@@ -469,7 +488,7 @@ int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
                 curserSetup[6] = line;                      // We assume only one line written to at a time
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode = dispOled_writeBytes(dispCtx, &curserSetup[0], 7);
+                retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &curserSetup[0], 7);
 
         case DISPLAY_TYPE_SH1106:
                 // SH1106 has different addressing than SSD1306
@@ -479,7 +498,7 @@ int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
                 curserSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode = dispOled_writeBytes(dispCtx, &curserSetup[0], 4);
+                retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &curserSetup[0], 4);
                 break;
         default:
                 break;
@@ -512,7 +531,7 @@ int dispOled_clearDisplay(dispCtx_t *dispCtx) {
                 }
 
                 // Clear one line
-                retCode = dispOled_writeBytes(dispCtx, &zero[0], (dispCtx->maxHorzPixel+dispCtx->horzOffset));
+                retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &zero[0], (dispCtx->maxHorzPixel+dispCtx->horzOffset));
                 if (retCode != 0) {
                         return retCode;
                 }
@@ -570,7 +589,7 @@ int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_
         }
 
         // Write the data to display
-        retCode = dispOled_writeBytes(dispCtx, &dispData[0], dispDataIdx);
+	retCode = i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &dispData[0], dispDataIdx);
 
         return retCode;
 }
@@ -592,7 +611,7 @@ int ipc_sem_unlock(int semLock) {
 /*
  * Update display hardware specific to our platform
  *
- * Use of one of 2 types of a small 7 row, 12 char per row OLED display 
+ * Use of one of 2 types of a small 7 row, 12 char per row OLED display
  *
  * Set row and column to non-zero to position cursor prior to text output
  *
@@ -767,6 +786,7 @@ int main(int argc, char **argv)
     // If there is a battery_state topic and we get the callback also show battery voltage
     if (g_batteryVoltage > 0.0) {
         ROS_INFO("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
+
         std::stringstream stream;
         stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
         if (g_batteryVoltage >= BAT_LOW_LEVEL) {
@@ -793,3 +813,4 @@ int main(int argc, char **argv)
   return 0;
 }
 
+#endif // __arm__ || __aarch64__

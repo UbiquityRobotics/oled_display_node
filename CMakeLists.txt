@@ -107,7 +107,7 @@ target_link_libraries(oled_display_node
     ${catkin_LIBRARIES}
 )
 
-add_dependencies(oled_display_node oled_display_node_generate_messages_cpp)
+add_dependencies(oled_display_node ${PROJECT_NAME}_generate_messages_cpp)
 
 #############
 ## Install ##
