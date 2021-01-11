@@ -58,9 +58,10 @@ int main(int argc, char** argv) {
 #define  DISP_LINE_IP_ADDR     1
 #define  DISP_LINE_BATT_VOLTS  3
 
-// We are putting a battery low blinking in here but this logic should really be
-// located in motor node so this is temporary feature
-#define  BAT_LOW_LEVEL  23.0                     // Start to warn of low battery voltage with blinking display
+// We are putting a battery low blinking feature to warn user of very low battery
+// Our goal is to set a lower threshold than this (default 22.5V) in motor node to stop motor control
+// once that point is hit
+#define  BAT_LOW_LEVEL  23.5                     // Start to warn of low battery voltage with blinking display
 
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
@@ -785,17 +786,19 @@ int main(int argc, char **argv)
 
     // If there is a battery_state topic and we get the callback also show battery voltage
     if (g_batteryVoltage > 0.0) {
-        ROS_INFO("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
+        ROS_DEBUG("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
 
+        // Control what shows up after the voltage reading.
+        // If you change the text, use same number of chars so display does not move around on the line
         std::stringstream stream;
         stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
         if (g_batteryVoltage >= BAT_LOW_LEVEL) {
-            stream << " OK  ";
+            stream <<   " OK  ";
         } else {
           if ((loopIdx & 1) == 0) { 
               stream << " LOW ";
           } else {
-              stream << "    ";
+              stream << "     ";
           }
         }
         std::string battText = "Bat " + stream.str();
