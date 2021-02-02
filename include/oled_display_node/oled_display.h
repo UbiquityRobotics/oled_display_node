@@ -32,15 +32,26 @@
 #define SH1106_MAX_LINE           7    // Maximum lines on the display
 #define SH1106_MAX_COLUMN        15    // Maximum columns of characters on the display
 #define SH1106_HORZ_OFFSET        2    // Pixel offset from left most pixel to start text
+#define SH1106_END_HORZ_PIXEL     0    // Pixels at end of horizontal line that are not used
 
 #define SSD1306_MAX_HORZ_PIXEL  127    // Maximum horizontal pixel on the display
 #define SSD1306_MAX_VERT_PIXEL   64    // Maximum vertical pixel on the display
 #define SSD1306_MAX_LINE          7    // Maximum lines on the display
 #define SSD1306_MAX_COLUMN       15    // Maximum columns of characters on the display
 #define SSD1306_HORZ_OFFSET       0    // Pixel offset from left most pixel to start text
+#define SSD1306_END_HORZ_PIXEL    4    // Pixels at end of horizontal line that are not used
 
 #define DISPLAY_CHAR_WIDTH  8
 #define DISPLAY_CHAR_HEIGHT 8
+
+// Some bit-encoded errors for access to the OLED display
+#define IO_ERR_DEV_OPEN_FAILED     0x02
+#define IO_ERR_IOCTL_ADDR_SET      0x04
+#define IO_ERR_WRITE_FAILED        0x08
+#define IO_ERR_READ_FAILED         0x10
+#define IO_ERR_READ_LENGTH         0x20
+#define IO_ERR_BAD_DISP_CONTEXT    0x80
+
 
 
 // Display Context used to support different OLED display types
@@ -54,6 +65,7 @@ typedef struct {
     int    maxVertPixel;
     int    maxHorzPixel;
     int    horzOffset;
+    int    endHorzPixel;
 } dispCtx_t;
 
 // Following definitions are bollowed from
