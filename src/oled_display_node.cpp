@@ -29,20 +29,6 @@
  *
  */
 
-// This ensures that the code is ran on Raspberry Pi architecture
-#ifdef __x86_64__
-
-#include <stdio.h>
-
-int main(int argc, char** argv) {
-    (void)fprintf(stderr, "The oled_display_node for the x86/64 is a fake!\n");
-    return 1;
-}
-
-#endif // __x86_64__
-
-#if defined(__arm__) || defined(__aarch64__)
-
 /*
  * Display Output Subsystem
  *
@@ -827,5 +813,3 @@ int main(int argc, char **argv)
 
   return 0;
 }
-
-#endif // __arm__ || __aarch64__
