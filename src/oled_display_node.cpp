@@ -634,7 +634,7 @@ int ipc_sem_unlock(int semLock) {
  */
 int  displayUpdate(std::string text, int attributes, int row, int column, int numChars, int semLock)
 {
-  int  messageLength = text.length();
+  size_t  messageLength = text.length();
   bool dbgPrint = false;
 
   if (numChars > 0) {
@@ -648,7 +648,7 @@ int  displayUpdate(std::string text, int attributes, int row, int column, int nu
   int segment = column * DISPLAY_CHAR_WIDTH;
   int dispRow  = row;   // Bypass the system info area
   int maxChars = oledDispCtx.maxColumn - 1;
-  int lineChars = messageLength;
+  size_t lineChars = messageLength;
 
   // We only initialize display context and do not re-initialize actual display
   dispOled_initCtx(OLED_I2C_DEVICE, &oledDispCtx, g_oledDisplayCtx.dispType, OLED_DISPLAY_ADDR);
