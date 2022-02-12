@@ -785,11 +785,17 @@ void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
  */
 void motorPowerActiveApiCallback(const std_msgs::Bool::ConstPtr& msg)
 {
+  int32_t newPowerState;
   if (msg->data) {
-    g_motorPowerActive = 1;
+    newPowerState = 1;
   } else {
-    g_motorPowerActive = 0;
+    newPowerState = 0;
   }
+  if (newPowerState != g_motorPowerActive) {
+    ROS_INFO("%s Motor power active went from %d to %d", THIS_NODE_NAME, g_motorPowerActive, newPowerState);
+  }
+
+  g_motorPowerActive = newPowerState;
   return;
 }
 
@@ -893,7 +899,7 @@ int main(int argc, char **argv)
 
         // If you change the text, use same number of chars so display does not move around on the line
         std::stringstream powStream;
-	if (g_motorPowerActive > 0 >= BAT_CHARGING_LEVEL) {
+	if (g_motorPowerActive > 0) {
             powStream <<   "  ON";
         }else {
             powStream <<   " OFF";
