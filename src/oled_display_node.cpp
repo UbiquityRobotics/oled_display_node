@@ -393,7 +393,7 @@ int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *di
 
     // We have seen incorrect values read sometimes and because this chip relies on
     // a status register in the SH1106 we better read a few times and 'vote'
-    for (i=0 ; i < 3 ; i++) {
+    for (i=0 ; i < 5 ; i++) {
         // Read the status register at chip addr 0 to decide on chip type - set flag to true
         retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
         if (retCount < 0) {
@@ -417,7 +417,7 @@ int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *di
                 vote1106++;
             }
         }
-        usleep(25000);
+        usleep(30000);
     }
 
     // count the votes and set display type
@@ -900,9 +900,9 @@ int main(int argc, char **argv)
         // If you change the text, use same number of chars so display does not move around on the line
         std::stringstream powStream;
 	if (g_motorPowerActive > 0) {
-            powStream <<   "  ON";
+            powStream <<   " ON";
         }else {
-            powStream <<   " OFF";
+            powStream <<   "OFF";
         }
         std::string motPowerText = "Mot Power " + powStream.str();
         dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_MOTOR_POWER, 1, DISP_TEXT_START_MODE, motPowerText.c_str());
