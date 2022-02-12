@@ -63,6 +63,9 @@ int main(int argc, char** argv) {
 // once that point is hit
 #define  BAT_LOW_LEVEL  23.5                     // Start to warn of low battery voltage with blinking display
 
+// Define a level where we think the charger is plugged in at this time
+#define  BAT_CHARGING_LEVEL  27.0                // Indicate battery is on charger for high voltages
+
 // Type and I2C address of the display
 // The small 1.3" OLED displays typically use the SH1106 controller chip
 // The 0.96" OLED display tends to use the SSD1306 controller.
@@ -176,6 +179,33 @@ std::string getPopen(std::string input) {
     } catch (...) {  }
 
     return result;
+}
+
+// getMainIpAddress()
+// We will use any eth0 IP address that has 192.168.1 in it unless that is not found in which case use wlan0 IP
+// For some systems with Lidar the ethernet IP is 192.168.42.x  so in that case wlan0 will be used rather than hard lan IP.
+// One disadvantage is on older images we did not rename the ethernet to enet0 so we will not get those plugged in
+// network cables but this is a robot and plugged in lan is not the typical usage, wlan0 is 'normal'
+//
+void  getMainIpAddress(std::string &ipAddress, int logFindings) {
+  // ip -o -4 addr returns:  2: eth0    inet 192.168.1.164/24 brd 192.168.1.255 scope global eth0\       valid_lft forever 
+  std::string  enetIpAddress = getPopen("ip -o -4 addr | grep eth0  | awk '{print $4}'");  // IP with /24 mask bits at end
+  std::string  wlanIpAddress = getPopen("ip -o -4 addr | grep wlan0 | awk '{print $4}'");  // IP with /24 mask bits at end
+  std::string  mainIpAddress("notfound");
+
+  if (enetIpAddress.length() > 8) {
+      mainIpAddress.assign(enetIpAddress.substr(0,enetIpAddress.find('/')));
+      if (logFindings != 0) {
+          ROS_INFO("%s The eth0 IP will be the displayed IP of %s", THIS_NODE_NAME, mainIpAddress.c_str());
+      }
+  } else {
+      mainIpAddress.assign(wlanIpAddress.substr(0,wlanIpAddress.find('/')));
+      if (logFindings != 0) {
+          ROS_INFO("%s The wlan0 IP will be the displayed IP of %s", THIS_NODE_NAME, mainIpAddress.c_str());
+      }
+  }
+  ipAddress.assign(mainIpAddress);
+  return;
 }
 
 //  These commands are sent to initialize SSD1306.
@@ -350,33 +380,50 @@ int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *di
 {
     uint8_t buf[16];
     int     retCode = 0;
+    int     retCount = 0;
+    int     i = 0;
+    int     vote1106 = 0;
+    int     vote1306 = 0;
     char    device[MX_DEV_NAME_LEN];
     strncpy(&device[0], devName.c_str(), MX_DEV_NAME_LEN);
     device[(MX_DEV_NAME_LEN-1)] = 0;     // protect against long dev names
 
-    // Read the status register at chip addr 0 to decide on chip type - set flag to true
-    int retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
-    if (retCount < 0) {
-        ROS_ERROR("Error 0x%x in reading OLED status register at 7bit I2CAddr 0x%x",
-            retCount, i2c7bitAddr);
-        *dispType = DISPLAY_TYPE_NONE;
-        retCode = IO_ERR_READ_FAILED;
-    } else if (retCount != 1) {
-        ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x",
+    // We have seen incorrect values read sometimes and because this chip relies on
+    // a status register in the SH1106 we better read a few times and 'vote'
+    for (i=0 ; i < 3 ; i++) {
+        // Read the status register at chip addr 0 to decide on chip type - set flag to true
+        retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
+        if (retCount < 0) {
+            ROS_ERROR("Error 0x%x in reading OLED status register at 7bit I2CAddr 0x%x",
+                retCount, i2c7bitAddr);
+            *dispType = DISPLAY_TYPE_NONE;
+            retCode = IO_ERR_READ_FAILED;
+        } else if (retCount != 1) {
+            ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x",
             i2c7bitAddr);
-        *dispType = DISPLAY_TYPE_NONE;
-        retCode = IO_ERR_READ_LENGTH;;
-    } else {
-        ROS_INFO("Read OLED status register as 0x%02x", buf[0]);
-        if ((buf[0] & 0x07) == 0x06) {
-            // We found lower 3 bit as a 6 but datasheet does not spec it
-            *dispType = DISPLAY_TYPE_SSD1306;
+            *dispType = DISPLAY_TYPE_NONE;
+            retCode = IO_ERR_READ_LENGTH;;
         } else {
-            // Data sheet guarentees lower 3 bits as 0
-            // We are going to assume this type if SSD1306 was not detected
-            *dispType = DISPLAY_TYPE_SH1106;
+            ROS_INFO("Read OLED status register as 0x%02x on pass %d", buf[0],i);
+            if ((buf[0] & 0x07) == 0x06) {
+                // We found lower 3 bit as a 6 but datasheet does not spec it
+                vote1306++;
+            } else {
+                // Data sheet guarentees lower 3 bits as 0
+                // We are going to vote by assumption that this is a SSD1306
+                vote1106++;
+            }
         }
+        usleep(25000);
     }
+
+    // count the votes and set display type
+    if (vote1106 > vote1306) {
+        *dispType = DISPLAY_TYPE_SH1106;
+    } else {
+        *dispType = DISPLAY_TYPE_SSD1306;
+    }
+
     return retCode;
 }
 
@@ -750,7 +797,8 @@ int main(int argc, char **argv)
   std::string hostname = getPopen("uname -n");
 
   // Here we will fetch the current IP address but we assume this node does not start till it is valid
-  std::string firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
+  std::string displayedIpAddress;
+  getMainIpAddress(displayedIpAddress, 1);
 
   char dispBuf[32];
   int  dispError = 0;
@@ -763,7 +811,7 @@ int main(int argc, char **argv)
       ros::Duration(1.0).sleep();
       dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
       ros::Duration(updateDelay).sleep();
-      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, displayedIpAddress.c_str());
       ros::Duration(updateDelay).sleep();
 
       ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
@@ -790,10 +838,10 @@ int main(int argc, char **argv)
   {
     loopIdx++;
     hostname = getPopen("uname -n");
-    firstIpAddress = getPopen("hostname -I | cut -f 1 -d' '");
     dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
     ros::Duration(updateDelay).sleep();
-    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, firstIpAddress.c_str());
+    getMainIpAddress(displayedIpAddress, 0);
+    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, displayedIpAddress.c_str());
     ros::Duration(updateDelay).sleep();
 
     // If there is a battery_state topic and we get the callback also show battery voltage
@@ -804,10 +852,12 @@ int main(int argc, char **argv)
         // If you change the text, use same number of chars so display does not move around on the line
         std::stringstream stream;
         stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
-        if (g_batteryVoltage >= BAT_LOW_LEVEL) {
+	if (g_batteryVoltage >= BAT_CHARGING_LEVEL) {
+            stream <<   " CHRG";
+        }else if (g_batteryVoltage >= BAT_LOW_LEVEL) {
             stream <<   " OK  ";
         } else {
-          if ((loopIdx & 1) == 0) { 
+          if ((loopIdx & 1) == 0) {
               stream << " LOW ";
           } else {
               stream << "     ";
