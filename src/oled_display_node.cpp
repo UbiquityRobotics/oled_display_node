@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
 #define  DISP_LINE_HOSTNAME    0
 #define  DISP_LINE_IP_ADDR     1
 #define  DISP_LINE_BATT_VOLTS  3
+#define  DISP_LINE_MOTOR_POWER 5 
 
 // We are putting a battery low blinking feature to warn user of very low battery
 // Our goal is to set a lower threshold than this (default 22.5V) in motor node to stop motor control
@@ -114,6 +115,7 @@ int main(int argc, char** argv) {
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include "std_msgs/Bool.h"
 
 // These next few are for I2C and ioctls and file opens
 #include <linux/i2c-dev.h>
@@ -135,6 +137,7 @@ int main(int argc, char** argv) {
 
 // Some limited state for display
 double g_batteryVoltage = 0.0;
+int32_t g_motorPowerActive = -1;
 
 // Display context
 dispCtx_t g_oledDisplayCtx;
@@ -772,11 +775,24 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
  */
 void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
 {
-  int i2cSemLockId = -9;
 
   g_batteryVoltage = msg->voltage;
 
 }
+
+/**
+ * Receive messages for battery state
+ */
+void motorPowerActiveApiCallback(const std_msgs::Bool::ConstPtr& msg)
+{
+  if (msg->data) {
+    g_motorPowerActive = 1;
+  } else {
+    g_motorPowerActive = 0;
+  }
+  return;
+}
+
 
 
 
@@ -828,6 +844,8 @@ int main(int argc, char **argv)
   // Set to subscribe to the battery_state topic and we then get callbacks for each message
   ros::Subscriber sub2 = nh.subscribe("battery_state", 1000, batteryStateApiCallback);
 
+  // Set to subscribe to the motor_power_active topic
+  ros::Subscriber sub3 = nh.subscribe("motor_power_active", 1000, motorPowerActiveApiCallback);
 
   // We will refresh the lines from time to time in case IP addr has changed
   ros::Rate loop_rate(0.5);
@@ -865,6 +883,23 @@ int main(int argc, char **argv)
         }
         std::string battText = "Bat " + stream.str();
         dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
+        ros::Duration(updateDelay).sleep();
+    }
+
+
+    // If there is a motor_power_active topic and we get the callback also show motor power status
+    if (g_motorPowerActive >= 0) {
+        ROS_DEBUG("%s motor power active is now %d", THIS_NODE_NAME, g_motorPowerActive);
+
+        // If you change the text, use same number of chars so display does not move around on the line
+        std::stringstream powStream;
+	if (g_motorPowerActive > 0 >= BAT_CHARGING_LEVEL) {
+            powStream <<   "  ON";
+        }else {
+            powStream <<   " OFF";
+        }
+        std::string motPowerText = "Mot Power " + powStream.str();
+        dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_MOTOR_POWER, 1, DISP_TEXT_START_MODE, motPowerText.c_str());
         ros::Duration(updateDelay).sleep();
     }
 
