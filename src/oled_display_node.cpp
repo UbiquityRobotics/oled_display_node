@@ -68,13 +68,13 @@ int main(int argc, char** argv) {
 #define  BAT_CHARGING_LEVEL  27.0                // Indicate battery is on charger for high voltages
 
 // Type and I2C address of the display
-// The small 1.3" OLED displays typically use the SH1106 controller chip
+// The small 1.3" OLED displays specified for production use the SH1106 controller chip
 // The 0.96" OLED display tends to use the SSD1306 controller.
 // The SH1106 is fairly compatible with SSD1306 basic, the difference is that the SH1106 control chip
 // RAM space is 132*64, while SSD1306 space is 128*64.
 // This code supports the 1.3" OLED with the SH1106 controller chip by default
 // So besides different initialization bytes the display starts 2 bytes later in one vs the other
-#define OLED_DISPLAY_TYPE  DISPLAY_TYPE_AUTO     // Or it can be forced ie DISPLAY_TYPE_SH1106
+#define OLED_DISPLAY_TYPE  DISPLAY_TYPE_SH1106     // Or use DISPLAY_TYPE_AUTO although that sometimes fails
 #define OLED_DISPLAY_ADDR  SH1106_OLED_I2C_ADDRESS
 #define OLED_I2C_DEVICE    "/dev/i2c-1"          // SYSTEM SPECIFIC
 
