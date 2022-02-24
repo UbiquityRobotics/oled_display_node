@@ -2,8 +2,8 @@
 Changelog for package oled_display_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.1.0 (2022-02-24)
+------------------
 * Forcing display type to SH1106 because auto detection can fail on some displays and we specify the SH1106 for production so it is best to not auto-detect
 * Oled fixes feb2022 - Battery charge and motor power on off shown (`#20 <https://github.com/UbiquityRobotics/oled_display_node/issues/20>`_)
 * Fix IP addr logic for proper IP addr on display.  Show CHRG if battery above 27V.  Better detection of display type which before some displays could be initialized wrong and show text backwards
