@@ -2,8 +2,8 @@
 Changelog for package oled_display_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.1.1 (2022-02-25)
+------------------
 * added sensor_msgs to package xml
 * Contributors: Janez Cimerman
 
