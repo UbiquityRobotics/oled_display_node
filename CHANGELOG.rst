@@ -2,6 +2,11 @@
 Changelog for package oled_display_node
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* added sensor_msgs to package xml
+* Contributors: Janez Cimerman
+
 1.1.0 (2022-02-24)
 ------------------
 * Forcing display type to SH1106 because auto detection can fail on some displays and we specify the SH1106 for production so it is best to not auto-detect
