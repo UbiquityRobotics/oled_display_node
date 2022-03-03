@@ -55,9 +55,10 @@ int main(int argc, char** argv) {
 
 // Default lines to output text to from this module
 #define  DISP_LINE_HOSTNAME    0
-#define  DISP_LINE_IP_ADDR     1
-#define  DISP_LINE_BATT_VOLTS  3
-#define  DISP_LINE_MOTOR_POWER 5 
+#define  DISP_LINE_IP_WLAN     1
+#define  DISP_LINE_IP_ETH     3
+#define  DISP_LINE_BATT_VOLTS  5
+#define  DISP_LINE_MOTOR_POWER 7 
 
 // We are putting a battery low blinking feature to warn user of very low battery
 // Our goal is to set a lower threshold than this (default 22.5V) in motor node to stop motor control
@@ -65,7 +66,7 @@ int main(int argc, char** argv) {
 #define  BAT_LOW_LEVEL  23.5                     // Start to warn of low battery voltage with blinking display
 
 // Define a level where we think the charger is plugged in at this time
-#define  BAT_CHARGING_LEVEL  27.0                // Indicate battery is on charger for high voltages
+#define  BAT_CHARGING_LEVEL  27.8                // Indicate battery is on charger for high voltages
 
 // Type and I2C address of the display
 // The small 1.3" OLED displays specified for production use the SH1106 controller chip
@@ -136,6 +137,7 @@ int main(int argc, char** argv) {
 #include <sensor_msgs/BatteryState.h>
 
 // Some limited state for display
+std::string g_batteryPercentage = "    ";
 double g_batteryVoltage = 0.0;
 int32_t g_motorPowerActive = -1;
 
@@ -184,30 +186,25 @@ std::string getPopen(std::string input) {
     return result;
 }
 
-// getMainIpAddress()
-// We will use any eth0 IP address that has 192.168.1 in it unless that is not found in which case use wlan0 IP
-// For some systems with Lidar the ethernet IP is 192.168.42.x  so in that case wlan0 will be used rather than hard lan IP.
-// One disadvantage is on older images we did not rename the ethernet to enet0 so we will not get those plugged in
-// network cables but this is a robot and plugged in lan is not the typical usage, wlan0 is 'normal'
-//
-void  getMainIpAddress(std::string &ipAddress, int logFindings) {
+// getIpAddressses()
+// We show both the WLAN0 and ETH0 adapter IPs since both can be required by the user
+void  getIpAddressses(std::string &ethAddress, std::string &wlanAddress, int logFindings) {
   // ip -o -4 addr returns:  2: eth0    inet 192.168.1.164/24 brd 192.168.1.255 scope global eth0\       valid_lft forever 
   std::string  enetIpAddress = getPopen("ip -o -4 addr | grep eth0  | awk '{print $4}'");  // IP with /24 mask bits at end
   std::string  wlanIpAddress = getPopen("ip -o -4 addr | grep wlan0 | awk '{print $4}'");  // IP with /24 mask bits at end
-  std::string  mainIpAddress("notfound");
 
   if (enetIpAddress.length() > 8) {
-      mainIpAddress.assign(enetIpAddress.substr(0,enetIpAddress.find('/')));
-      if (logFindings != 0) {
-          ROS_INFO("%s The eth0 IP will be the displayed IP of %s", THIS_NODE_NAME, mainIpAddress.c_str());
-      }
-  } else {
-      mainIpAddress.assign(wlanIpAddress.substr(0,wlanIpAddress.find('/')));
-      if (logFindings != 0) {
-          ROS_INFO("%s The wlan0 IP will be the displayed IP of %s", THIS_NODE_NAME, mainIpAddress.c_str());
-      }
+      ethAddress.assign(enetIpAddress.substr(0,enetIpAddress.find('/')));
   }
-  ipAddress.assign(mainIpAddress);
+  if (wlanIpAddress.length() > 8) {
+      wlanAddress.assign(wlanIpAddress.substr(0,wlanIpAddress.find('/')));
+  }
+
+  if (logFindings != 0) {
+      ROS_INFO("%s The eth0 IP will be the displayed IP of %s", THIS_NODE_NAME, ethAddress.c_str());
+      ROS_INFO("%s The wlan0 IP will be the displayed IP of %s", THIS_NODE_NAME, wlanAddress.c_str());
+  }
+
   return;
 }
 
@@ -538,30 +535,30 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint
  */
 int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
         int retCode = 0;
-        uint8_t curserSetup[8];
+        uint8_t cursorSetup[8];
 
         switch (dispCtx->dispType) {
         case DISPLAY_TYPE_SSD1306:
-                curserSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
-                curserSetup[1] = OLED_CMD_SET_COLUMN_RANGE;
-                curserSetup[2] = column;            // Start of printing from left seg as 0
-                curserSetup[3] = dispCtx->maxHorzPixel;     // last index of printing segments
-                curserSetup[4] = OLED_CMD_SET_PAGE_RANGE;
-                curserSetup[5] = line;                      // We assume only one line written to at a time
-                curserSetup[6] = line;                      // We assume only one line written to at a time
+                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                cursorSetup[1] = OLED_CMD_SET_COLUMN_RANGE;
+                cursorSetup[2] = column;            // Start of printing from left seg as 0
+                cursorSetup[3] = dispCtx->maxHorzPixel;     // last index of printing segments
+                cursorSetup[4] = OLED_CMD_SET_PAGE_RANGE;
+                cursorSetup[5] = line;                      // We assume only one line written to at a time
+                cursorSetup[6] = line;                      // We assume only one line written to at a time
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &curserSetup[0], 7);
+                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 7);
 
         case DISPLAY_TYPE_SH1106:
                 // SH1106 has different addressing than SSD1306
-                curserSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
-                curserSetup[1] = 0xB0 | (line & 0xf);
-                curserSetup[2] = 0x10 | (((column + dispCtx->horzOffset) & 0xf0) >> 4);  // Upper column address
-                curserSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
+                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                cursorSetup[1] = 0xB0 | (line & 0xf);
+                cursorSetup[2] = 0x10 | (((column + dispCtx->horzOffset) & 0xf0) >> 4);  // Upper column address
+                cursorSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
 
                 // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &curserSetup[0], 4);
+                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 4);
                 break;
         default:
                 break;
@@ -625,37 +622,37 @@ int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_
 
     dispData[0] = OLED_CONTROL_BYTE_DATA_STREAM;     // Data starts on byte after this 1st one
 
-        if (line > 7) {
-                return -1;              // out of range line
-        }
-        if ((segment + (text_len * 8)) > dispCtx->maxHorzPixel) {
-                return -2;              // out of range starting segment to end of the print with 8x8 font
-        }
-        int startSegment = segment;          // MOD: When MAX_SEGMENT was 0x7F this was just    segment & MAX_SEGMENT
-        if (segment > (dispCtx->maxHorzPixel-1)) {
-                segment = dispCtx->maxHorzPixel-1; // Cap this to max end of line segment
-        }
-        if (center != 0) {
-                startSegment = (dispCtx->maxHorzPixel - (text_len * DISPLAY_CHAR_WIDTH)) / 2;
-        }
+    if (line > 7) {
+            return -1;              // out of range line
+    }
+    if ((segment + (text_len * 8)) > dispCtx->maxHorzPixel) {
+            return -2;              // out of range starting segment to end of the print with 8x8 font
+    }
+    int startSegment = segment;          // MOD: When MAX_SEGMENT was 0x7F this was just    segment & MAX_SEGMENT
+    if (segment > (dispCtx->maxHorzPixel-1)) {
+            segment = dispCtx->maxHorzPixel-1; // Cap this to max end of line segment
+    }
+    if (center != 0) {
+            startSegment = (dispCtx->maxHorzPixel - (text_len * DISPLAY_CHAR_WIDTH)) / 2;
+    }
 
-        retCode |= dispOled_setCursor(dispCtx, startSegment, line);
-        if (retCode != 0) {
-                return retCode;
-        }
+    retCode |= dispOled_setCursor(dispCtx, startSegment, line);
+    if (retCode != 0) {
+            return retCode;
+    }
 
-        // Form pixels to send as data by lookup in font table
-        for (uint8_t i = 0; i < text_len; i++) {
-                // For each column of pixels for this char send a data byte which is one vertical column of pixels
-                for (uint8_t charCol = 0; charCol < DISPLAY_CHAR_WIDTH; charCol++) {
-                        dispData[dispDataIdx++] = font8x8_basic_tr[(int)(text[i])][charCol];
-                }
-        }
+    // Form pixels to send as data by lookup in font table
+    for (uint8_t i = 0; i < text_len; i++) {
+            // For each column of pixels for this char send a data byte which is one vertical column of pixels
+            for (uint8_t charCol = 0; charCol < DISPLAY_CHAR_WIDTH; charCol++) {
+                    dispData[dispDataIdx++] = font8x8_basic_tr[(int)(text[i])][charCol];
+            }
+    }
 
-        // Write the data to display
-	retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &dispData[0], dispDataIdx);
+    // Write the data to display
+    retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &dispData[0], dispDataIdx);
 
-        return retCode;
+    return retCode;
 }
 
 // ==============================================  END OLED DISPLAY API CALLS =================================
@@ -775,9 +772,16 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
  */
 void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
 {
+  std::string percent = std::to_string((int)((msg->percentage * 100) + 0.5))+"%";
+
+  switch(percent.length()){
+    case 4: g_batteryPercentage = percent; break;
+    case 3: g_batteryPercentage = " "+percent; break;
+    case 2: g_batteryPercentage = "  "+percent; break;
+    default: g_batteryPercentage = "    ";
+  }
 
   g_batteryVoltage = msg->voltage;
-
 }
 
 /**
@@ -819,8 +823,9 @@ int main(int argc, char **argv)
   std::string hostname = getPopen("uname -n");
 
   // Here we will fetch the current IP address but we assume this node does not start till it is valid
-  std::string displayedIpAddress;
-  getMainIpAddress(displayedIpAddress, 1);
+  std::string displayedETHAddress;
+  std::string displayedWLANAddress;
+  getIpAddressses(displayedETHAddress, displayedWLANAddress, 1);
 
   char dispBuf[32];
   int  dispError = 0;
@@ -833,7 +838,9 @@ int main(int argc, char **argv)
       ros::Duration(1.0).sleep();
       dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
       ros::Duration(updateDelay).sleep();
-      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, displayedIpAddress.c_str());
+      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
+      ros::Duration(updateDelay).sleep();
+      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
       ros::Duration(updateDelay).sleep();
 
       ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
@@ -864,32 +871,35 @@ int main(int argc, char **argv)
     hostname = getPopen("uname -n");
     dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
     ros::Duration(updateDelay).sleep();
-    getMainIpAddress(displayedIpAddress, 0);
-    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ADDR, 0, DISP_TEXT_START_MODE, displayedIpAddress.c_str());
+
+    getIpAddressses(displayedETHAddress, displayedWLANAddress, 0);
+    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
+    ros::Duration(updateDelay).sleep();
+    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
     ros::Duration(updateDelay).sleep();
 
     // If there is a battery_state topic and we get the callback also show battery voltage
     if (g_batteryVoltage > 0.0) {
-        ROS_DEBUG("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
+      ROS_DEBUG("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
 
-        // Control what shows up after the voltage reading.
-        // If you change the text, use same number of chars so display does not move around on the line
-        std::stringstream stream;
-        stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
-	if (g_batteryVoltage >= BAT_CHARGING_LEVEL) {
-            stream <<   " CHRG";
-        }else if (g_batteryVoltage >= BAT_LOW_LEVEL) {
-            stream <<   " OK  ";
-        } else {
-          if ((loopIdx & 1) == 0) {
-              stream << " LOW ";
-          } else {
-              stream << "     ";
-          }
-        }
-        std::string battText = "Bat " + stream.str();
-        dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
-        ros::Duration(updateDelay).sleep();
+      // Control what shows up after the voltage reading.
+      // If you change the text, use same number of chars so display does not move around on the line
+      std::stringstream stream;
+      stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
+
+      if (g_batteryVoltage <= BAT_LOW_LEVEL && (loopIdx % 2) == 0){
+        stream << "V LOW";
+      }
+      else if (g_batteryVoltage >= BAT_CHARGING_LEVEL && (loopIdx % 3) == 0){
+        stream << " CHRG";
+      }
+      else{
+        stream << "V" << g_batteryPercentage;
+      }
+
+      std::string battText = "Bat:" + stream.str();
+      dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
+      ros::Duration(updateDelay).sleep();
     }
 
 
