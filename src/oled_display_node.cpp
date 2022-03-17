@@ -35,8 +35,8 @@
 #include <stdio.h>
 
 int main(int argc, char** argv) {
-    (void)fprintf(stderr, "The oled_display_node for the x86/64 is a fake!\n");
-    return 1;
+        (void)fprintf(stderr, "The oled_display_node for the x86/64 is a fake!\n");
+        return 1;
 }
 
 #endif // __x86_64__
@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 #define  BAT_LOW_LEVEL  23.5                     // Start to warn of low battery voltage with blinking display
 
 // Define a level where we think the charger is plugged in at this time
-#define  BAT_CHARGING_LEVEL  27.8                // Indicate battery is on charger for high voltages
+#define  BAT_CHARGING_LEVEL  27.0                // Indicate battery is on charger for high voltages
 
 // Type and I2C address of the display
 // The small 1.3" OLED displays specified for production use the SH1106 controller chip
@@ -138,8 +138,9 @@ int main(int argc, char** argv) {
 
 // Some limited state for display
 std::string g_batteryPercentage = "    ";
+std::string g_firmwareVersion = "---";
+std::string g_motorPowerActive = "OFF";
 double g_batteryVoltage = 0.0;
-int32_t g_motorPowerActive = -1;
 
 // Display context
 dispCtx_t g_oledDisplayCtx;
@@ -151,7 +152,7 @@ extern  int dispOled_init(std::string devName, dispCtx_t *dispCtx, int dispType,
 extern  int dispOled_clearDisplay(dispCtx_t *dispCtx);
 extern  int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line);
 extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment,
-                uint8_t center, const char *textStr);
+                                uint8_t center, const char *textStr);
 
 /*
  * @name    getPopen
@@ -164,48 +165,48 @@ extern  int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment
  * @note    This routine only uses the readable stream returned by `popen`
  */
 std::string getPopen(std::string input) {
-    std::string result("");;
-    char c;
-    FILE* fp;
+        std::string result("");;
+        char c;
+        FILE* fp;
 
-    try {   // Catch any bad operations with this trap
+        try {   // Catch any bad operations with this trap
 
-    fp = popen(input.c_str(), "r");
-    if (fp != NULL) {
-        do {
-            c = fgetc(fp);
-            if (isascii(c)) {
-                result += c;
-            }
-        } while (!feof(fp));
-        pclose(fp);
-    }
+        fp = popen(input.c_str(), "r");
+        if (fp != NULL) {
+                do {
+                        c = fgetc(fp);
+                        if (isascii(c)) {
+                                result += c;
+                        }
+                } while (!feof(fp));
+                pclose(fp);
+        }
 
-    } catch (...) {  }
+        } catch (...) {  }
 
-    return result;
+        return result;
 }
 
 // getIpAddressses()
 // We show both the WLAN0 and ETH0 adapter IPs since both can be required by the user
 void  getIpAddressses(std::string &ethAddress, std::string &wlanAddress, int logFindings) {
-  // ip -o -4 addr returns:  2: eth0    inet 192.168.1.164/24 brd 192.168.1.255 scope global eth0\       valid_lft forever 
-  std::string  enetIpAddress = getPopen("ip -o -4 addr | grep eth0  | awk '{print $4}'");  // IP with /24 mask bits at end
-  std::string  wlanIpAddress = getPopen("ip -o -4 addr | grep wlan0 | awk '{print $4}'");  // IP with /24 mask bits at end
+    // ip -o -4 addr returns:  2: eth0    inet 192.168.1.164/24 brd 192.168.1.255 scope global eth0\       valid_lft forever 
+    std::string  enetIpAddress = getPopen("ip -o -4 addr | grep eth0  | awk '{print $4}'");  // IP with /24 mask bits at end
+    std::string  wlanIpAddress = getPopen("ip -o -4 addr | grep wlan0 | awk '{print $4}'");  // IP with /24 mask bits at end
 
-  if (enetIpAddress.length() > 8) {
-      ethAddress.assign(enetIpAddress.substr(0,enetIpAddress.find('/')));
-  }
-  if (wlanIpAddress.length() > 8) {
-      wlanAddress.assign(wlanIpAddress.substr(0,wlanIpAddress.find('/')));
-  }
+    if (enetIpAddress.length() > 8) {
+            ethAddress.assign(enetIpAddress.substr(0,enetIpAddress.find('/')));
+    }
+    if (wlanIpAddress.length() > 8) {
+            wlanAddress.assign(wlanIpAddress.substr(0,wlanIpAddress.find('/')));
+    }
 
-  if (logFindings != 0) {
-      ROS_INFO("%s The eth0 IP will be the displayed IP of %s", THIS_NODE_NAME, ethAddress.c_str());
-      ROS_INFO("%s The wlan0 IP will be the displayed IP of %s", THIS_NODE_NAME, wlanAddress.c_str());
-  }
+    if (logFindings != 0) {
+            ROS_INFO("%s The eth0 IP will be the displayed IP of %s", THIS_NODE_NAME, ethAddress.c_str());
+            ROS_INFO("%s The wlan0 IP will be the displayed IP of %s", THIS_NODE_NAME, wlanAddress.c_str());
+    }
 
-  return;
+    return;
 }
 
 //  These commands are sent to initialize SSD1306.
@@ -214,28 +215,28 @@ void  getIpAddressses(std::string &ethAddress, std::string &wlanAddress, int log
 //  The chip interprits these 'packets' as command(s) or data byte(s) based on the leading control byte
 #define SSD1306_INIT_BYTE_COUNT         6
 static uint8_t ssd1306_init_bytes[SSD1306_INIT_BYTE_COUNT] = {
-        OLED_CONTROL_BYTE_CMD_STREAM,
-                OLED_CMD_SET_CHARGE_PUMP,       0x14,
-                OLED_CMD_SET_SEGMENT_REMAP,
-                OLED_CMD_SET_COM_SCAN_MODE,
-                OLED_CMD_DISPLAY_ON
+                OLED_CONTROL_BYTE_CMD_STREAM,
+                                OLED_CMD_SET_CHARGE_PUMP,       0x14,
+                                OLED_CMD_SET_SEGMENT_REMAP,
+                                OLED_CMD_SET_COM_SCAN_MODE,
+                                OLED_CMD_DISPLAY_ON
 };
 
 #define SH1106_INIT_BYTE_COUNT  17
 static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
-        OLED_CONTROL_BYTE_CMD_STREAM,
-                0x30,                           // Charge pump default
-                0x40,                           // RAM display line of 0
-                OLED_CMD_DISPLAY_OFF,
-                OLED_CMD_SET_SEGMENT_REMAP,
-                OLED_CMD_SET_COM_SCAN_MODE,
-                OLED_CMD_SET_DISPLAY_OFFSET, 0, // Sets mapping of display start line
-                OLED_CMD_DC_DC_CTRL_MODE, 0x8B, // Must have DISPLAY_OFF and follow tih 0x8B
-                0x81, 0x80,         // Display contrast set to second byte
-                OLED_CMD_DISPLAY_RAM,
-                OLED_CMD_DISPLAY_NORMAL,
-                OLED_CMD_SET_MUX_RATIO, 0x3F,   // Init multiplex ration to standard value
-                OLED_CMD_DISPLAY_ON
+                OLED_CONTROL_BYTE_CMD_STREAM,
+                                0x30,                           // Charge pump default
+                                0x40,                           // RAM display line of 0
+                                OLED_CMD_DISPLAY_OFF,
+                                OLED_CMD_SET_SEGMENT_REMAP,
+                                OLED_CMD_SET_COM_SCAN_MODE,
+                                OLED_CMD_SET_DISPLAY_OFFSET, 0, // Sets mapping of display start line
+                                OLED_CMD_DC_DC_CTRL_MODE, 0x8B, // Must have DISPLAY_OFF and follow tih 0x8B
+                                0x81, 0x80,         // Display contrast set to second byte
+                                OLED_CMD_DISPLAY_RAM,
+                                OLED_CMD_DISPLAY_NORMAL,
+                                OLED_CMD_SET_MUX_RATIO, 0x3F,   // Init multiplex ration to standard value
+                                OLED_CMD_DISPLAY_ON
 };
 
 /*
@@ -252,69 +253,69 @@ static uint8_t sh1106_init_bytes[SH1106_INIT_BYTE_COUNT] = {
  * @return              Returns number of bytes read where 0 or less implies some form of failure
  */
 static int i2c_read(const char *i2cDevFile, uint8_t i2c7bitAddr,
-                    uint8_t *pBuffer, int numBytes, uint8_t chipRegAddr, bool chipRegAddrFlag)
+                                        uint8_t *pBuffer, int numBytes, uint8_t chipRegAddr, bool chipRegAddrFlag)
 {
-    int       fd;                                     	  // File descriptor
-    const int slaveAddress = i2c7bitAddr;             	  // Address of the I2C device
-    int       retCode   = 0;
-    int       bytesRead = 0;
-    struct    i2c_msg msgs[2];                    	  // Low level representation of one segment of an I2C transaction
-    struct    i2c_rdwr_ioctl_data msgset[1];	 	  // Set of transaction segments
+        int       fd;                                         // File descriptor
+        const int slaveAddress = i2c7bitAddr;                 // Address of the I2C device
+        int       retCode   = 0;
+        int       bytesRead = 0;
+        struct    i2c_msg msgs[2];                        // Low level representation of one segment of an I2C transaction
+        struct    i2c_rdwr_ioctl_data msgset[1];          // Set of transaction segments
 
-    if ((fd = open(i2cDevFile, O_RDWR)) < 0) {   	  // Open port for reading and writing
-      ROS_ERROR("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
-      retCode = IO_ERR_DEV_OPEN_FAILED;
-      goto exitWithNoClose;
-    }
-
-    if (chipRegAddrFlag) {
-        msgs[0].addr = slaveAddress;
-        msgs[0].flags = 0;                       	  // Write bit
-        msgs[0].len = 1;                         	  // Slave Address/byte written to I2C slave address
-        msgs[0].buf = &chipRegAddr;              	  // Internal Chip Register Address
-        msgs[1].addr = slaveAddress;
-        msgs[1].flags = I2C_M_RD | I2C_M_NOSTART;	  // Read bit or Combined transaction bit
-        msgs[1].len = numBytes;                  	  // Number of bytes read
-        msgs[1].buf = pBuffer;                   	  // Output read buffer
-
-        msgset[0].msgs = msgs;
-        msgset[0].nmsgs = 2;                     	  // number of transaction segments (write and read)
-
-        // The ioctl here will execute I2C transaction with kernel enforced lock
-        if (ioctl(fd, I2C_RDWR, &msgset) < 0) {
-            ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
-            retCode = IO_ERR_IOCTL_ADDR_SET;
-            goto exitWithFileClose;
+        if ((fd = open(i2cDevFile, O_RDWR)) < 0) {        // Open port for reading and writing
+            ROS_ERROR("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
+            retCode = IO_ERR_DEV_OPEN_FAILED;
+            goto exitWithNoClose;
         }
-    }
-    else {
-	// The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
-    	if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {    // Set the port options and addr of the dev
-      	  ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
-      	  retCode = IO_ERR_IOCTL_ADDR_SET;
-          goto exitWithFileClose;
-    	}
 
-        bytesRead = read(fd, pBuffer, numBytes);
-        if (bytesRead != numBytes) {             	  // Verify that the number of bytes we requested were read
-          ROS_ERROR("Failed to read from I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
-          retCode = IO_ERR_READ_FAILED;
-          goto exitWithFileClose;
+        if (chipRegAddrFlag) {
+                msgs[0].addr = slaveAddress;
+                msgs[0].flags = 0;                            // Write bit
+                msgs[0].len = 1;                              // Slave Address/byte written to I2C slave address
+                msgs[0].buf = &chipRegAddr;                   // Internal Chip Register Address
+                msgs[1].addr = slaveAddress;
+                msgs[1].flags = I2C_M_RD | I2C_M_NOSTART;     // Read bit or Combined transaction bit
+                msgs[1].len = numBytes;                       // Number of bytes read
+                msgs[1].buf = pBuffer;                        // Output read buffer
+
+                msgset[0].msgs = msgs;
+                msgset[0].nmsgs = 2;                          // number of transaction segments (write and read)
+
+                // The ioctl here will execute I2C transaction with kernel enforced lock
+                if (ioctl(fd, I2C_RDWR, &msgset) < 0) {
+                        ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+                        retCode = IO_ERR_IOCTL_ADDR_SET;
+                        goto exitWithFileClose;
+                }
         }
-    }
-    exitWithFileClose:
-    close(fd);
+        else {
+    // The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
+            if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {    // Set the port options and addr of the dev
+                    ROS_ERROR("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+                    retCode = IO_ERR_IOCTL_ADDR_SET;
+                    goto exitWithFileClose;
+            }
 
-    exitWithNoClose:
+                bytesRead = read(fd, pBuffer, numBytes);
+                if (bytesRead != numBytes) {                  // Verify that the number of bytes we requested were read
+                    ROS_ERROR("Failed to read from I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+                    retCode = IO_ERR_READ_FAILED;
+                    goto exitWithFileClose;
+                }
+        }
+        exitWithFileClose:
+        close(fd);
 
-    // Read is odd in that + is num bytes read so make errors negative
-    if (retCode == 0) {
-        retCode = numBytes;
-    } else {
-        retCode = retCode * -1;
-    }
+        exitWithNoClose:
 
-    return retCode;
+        // Read is odd in that + is num bytes read so make errors negative
+        if (retCode == 0) {
+                retCode = numBytes;
+        } else {
+                retCode = retCode * -1;
+        }
+
+        return retCode;
 }
 
 /*
@@ -331,36 +332,36 @@ static int i2c_read(const char *i2cDevFile, uint8_t i2c7bitAddr,
 
 static int i2c_write(const char *i2cDevFile, uint8_t i2c7bitAddr, uint8_t *pBuffer, int numBytes)
 {
-    int        fd;                 		// File descriptor
-    int        retCode = 0;
-    const int  slaveAddress = i2c7bitAddr;      // Address of the I2C device
+        int        fd;                      // File descriptor
+        int        retCode = 0;
+        const int  slaveAddress = i2c7bitAddr;      // Address of the I2C device
 
-    // Open port for writing
-    if ((fd = open(i2cDevFile, O_WRONLY)) < 0) {
-      ROS_ERROR_ONCE("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
-      retCode = IO_ERR_DEV_OPEN_FAILED;
-      goto exitWithNoClose;
-    }
+        // Open port for writing
+        if ((fd = open(i2cDevFile, O_WRONLY)) < 0) {
+            ROS_ERROR_ONCE("Cannot open I2C def of %s with error %s", i2cDevFile, strerror(errno));
+            retCode = IO_ERR_DEV_OPEN_FAILED;
+            goto exitWithNoClose;
+        }
 
-    // The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
-    if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {  // Set the port options and addr of the dev
-      ROS_ERROR_ONCE("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
-      retCode = IO_ERR_IOCTL_ADDR_SET;
-      goto exitWithFileClose;
-    }
+        // The ioctl here will address the I2C slave device making it ready for 1 or more other bytes
+        if (ioctl(fd, I2C_SLAVE, slaveAddress) != 0) {  // Set the port options and addr of the dev
+            ROS_ERROR_ONCE("Failed to get bus access to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+            retCode = IO_ERR_IOCTL_ADDR_SET;
+            goto exitWithFileClose;
+        }
 
-    if (write(fd, pBuffer, numBytes) != numBytes) {
-        ROS_ERROR_ONCE("Failed to write to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
-        retCode = IO_ERR_WRITE_FAILED;
-        goto exitWithFileClose;
-    }
+        if (write(fd, pBuffer, numBytes) != numBytes) {
+                ROS_ERROR_ONCE("Failed to write to I2C device %s!  ERROR: %s", i2cDevFile, strerror(errno));
+                retCode = IO_ERR_WRITE_FAILED;
+                goto exitWithFileClose;
+        }
 
-    exitWithFileClose:
-    close(fd);
+        exitWithFileClose:
+        close(fd);
 
-    exitWithNoClose:
+        exitWithNoClose:
 
-    return retCode;
+        return retCode;
 }
 
 /*
@@ -378,53 +379,53 @@ static int i2c_write(const char *i2cDevFile, uint8_t i2c7bitAddr, uint8_t *pBuff
 #define MX_DEV_NAME_LEN 32
 int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *dispType)
 {
-    uint8_t buf[16];
-    int     retCode = 0;
-    int     retCount = 0;
-    int     i = 0;
-    int     vote1106 = 0;
-    int     vote1306 = 0;
-    char    device[MX_DEV_NAME_LEN];
-    strncpy(&device[0], devName.c_str(), MX_DEV_NAME_LEN);
-    device[(MX_DEV_NAME_LEN-1)] = 0;     // protect against long dev names
+        uint8_t buf[16];
+        int     retCode = 0;
+        int     retCount = 0;
+        int     i = 0;
+        int     vote1106 = 0;
+        int     vote1306 = 0;
+        char    device[MX_DEV_NAME_LEN];
+        strncpy(&device[0], devName.c_str(), MX_DEV_NAME_LEN);
+        device[(MX_DEV_NAME_LEN-1)] = 0;     // protect against long dev names
 
-    // We have seen incorrect values read sometimes and because this chip relies on
-    // a status register in the SH1106 we better read a few times and 'vote'
-    for (i=0 ; i < 5 ; i++) {
-        // Read the status register at chip addr 0 to decide on chip type - set flag to true
-        retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
-        if (retCount < 0) {
-            ROS_ERROR("Error 0x%x in reading OLED status register at 7bit I2CAddr 0x%x",
-                retCount, i2c7bitAddr);
-            *dispType = DISPLAY_TYPE_NONE;
-            retCode = IO_ERR_READ_FAILED;
-        } else if (retCount != 1) {
-            ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x",
-            i2c7bitAddr);
-            *dispType = DISPLAY_TYPE_NONE;
-            retCode = IO_ERR_READ_LENGTH;;
-        } else {
-            ROS_INFO("Read OLED status register as 0x%02x on pass %d", buf[0],i);
-            if ((buf[0] & 0x07) == 0x06) {
-                // We found lower 3 bit as a 6 but datasheet does not spec it
-                vote1306++;
-            } else {
-                // Data sheet guarentees lower 3 bits as 0
-                // We are going to vote by assumption that this is a SSD1306
-                vote1106++;
-            }
+        // We have seen incorrect values read sometimes and because this chip relies on
+        // a status register in the SH1106 we better read a few times and 'vote'
+        for (i=0 ; i < 5 ; i++) {
+                // Read the status register at chip addr 0 to decide on chip type - set flag to true
+                retCount = i2c_read(&device[0], i2c7bitAddr, &buf[0], 1, 0x00, true);
+                if (retCount < 0) {
+                        ROS_ERROR("Error 0x%x in reading OLED status register at 7bit I2CAddr 0x%x",
+                                retCount, i2c7bitAddr);
+                        *dispType = DISPLAY_TYPE_NONE;
+                        retCode = IO_ERR_READ_FAILED;
+                } else if (retCount != 1) {
+                        ROS_ERROR("Cannot read byte from OLED status register at 7bit Addr 0x%x",
+                        i2c7bitAddr);
+                        *dispType = DISPLAY_TYPE_NONE;
+                        retCode = IO_ERR_READ_LENGTH;;
+                } else {
+                        ROS_INFO("Read OLED status register as 0x%02x on pass %d", buf[0],i);
+                        if ((buf[0] & 0x07) == 0x06) {
+                                // We found lower 3 bit as a 6 but datasheet does not spec it
+                                vote1306++;
+                        } else {
+                                // Data sheet guarentees lower 3 bits as 0
+                                // We are going to vote by assumption that this is a SSD1306
+                                vote1106++;
+                        }
+                }
+                usleep(30000);
         }
-        usleep(30000);
-    }
 
-    // count the votes and set display type
-    if (vote1106 > vote1306) {
-        *dispType = DISPLAY_TYPE_SH1106;
-    } else {
-        *dispType = DISPLAY_TYPE_SSD1306;
-    }
+        // count the votes and set display type
+        if (vote1106 > vote1306) {
+                *dispType = DISPLAY_TYPE_SH1106;
+        } else {
+                *dispType = DISPLAY_TYPE_SSD1306;
+        }
 
-    return retCode;
+        return retCode;
 }
 
 /*
@@ -440,37 +441,37 @@ int dispOled_detectDisplayType(std::string devName, uint8_t i2c7bitAddr, int *di
  */
 int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispType, uint8_t i2cAddr)
 {
-    int retCode = 0;
+        int retCode = 0;
 
-    dispCtx->dispType = dispType;
-    dispCtx->i2cAddr = i2cAddr;
-    strcpy(&dispCtx->devName[0], devName.c_str());
+        dispCtx->dispType = dispType;
+        dispCtx->i2cAddr = i2cAddr;
+        strcpy(&dispCtx->devName[0], devName.c_str());
 
-    // Set max lines and horizontal segments for the display in use
-    switch (dispType) {
-    case DISPLAY_TYPE_SSD1306:
-        dispCtx->maxLine      = SSD1306_MAX_LINE;
-        dispCtx->maxColumn    = SSD1306_MAX_COLUMN;
-        dispCtx->maxVertPixel = SSD1306_MAX_VERT_PIXEL;
-        dispCtx->maxHorzPixel = SSD1306_MAX_HORZ_PIXEL;
-        dispCtx->horzOffset   = SSD1306_HORZ_OFFSET;
-        dispCtx->endHorzPixel = SSD1306_END_HORZ_PIXEL;
-        break;
-    case DISPLAY_TYPE_SH1106:
-        dispCtx->maxLine      = SH1106_MAX_LINE;
-        dispCtx->maxColumn    = SH1106_MAX_COLUMN;
-        dispCtx->maxVertPixel = SH1106_MAX_VERT_PIXEL;
-        dispCtx->maxHorzPixel = SH1106_MAX_HORZ_PIXEL;
-        dispCtx->horzOffset   = SH1106_HORZ_OFFSET;
-        dispCtx->endHorzPixel = SH1106_END_HORZ_PIXEL;
-        break;
-    default:
-        ROS_ERROR("%s: Unsupported display type of %d\n", THIS_NODE_NAME, dispType);
-        retCode = IO_ERR_BAD_DISP_CONTEXT;
-        break;
-    }
+        // Set max lines and horizontal segments for the display in use
+        switch (dispType) {
+        case DISPLAY_TYPE_SSD1306:
+                dispCtx->maxLine      = SSD1306_MAX_LINE;
+                dispCtx->maxColumn    = SSD1306_MAX_COLUMN;
+                dispCtx->maxVertPixel = SSD1306_MAX_VERT_PIXEL;
+                dispCtx->maxHorzPixel = SSD1306_MAX_HORZ_PIXEL;
+                dispCtx->horzOffset   = SSD1306_HORZ_OFFSET;
+                dispCtx->endHorzPixel = SSD1306_END_HORZ_PIXEL;
+                break;
+        case DISPLAY_TYPE_SH1106:
+                dispCtx->maxLine      = SH1106_MAX_LINE;
+                dispCtx->maxColumn    = SH1106_MAX_COLUMN;
+                dispCtx->maxVertPixel = SH1106_MAX_VERT_PIXEL;
+                dispCtx->maxHorzPixel = SH1106_MAX_HORZ_PIXEL;
+                dispCtx->horzOffset   = SH1106_HORZ_OFFSET;
+                dispCtx->endHorzPixel = SH1106_END_HORZ_PIXEL;
+                break;
+        default:
+                ROS_ERROR("%s: Unsupported display type of %d\n", THIS_NODE_NAME, dispType);
+                retCode = IO_ERR_BAD_DISP_CONTEXT;
+                break;
+        }
 
-    return 0;
+        return 0;
 }
 
 /*
@@ -486,41 +487,41 @@ int dispOled_initCtx(std::string devName, dispCtx_t *dispCtx, int dispType, uint
  */
 int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint8_t i2cAddr)
 {
-    int retCode = 0;
-    int dispType = displayType;
+        int retCode = 0;
+        int dispType = displayType;
 
-    // If this is called with NONE we try to autodetect the display
-    if (dispType == DISPLAY_TYPE_AUTO) {
-        // Auto-detect display. Detects if display present and type of OLED display
-        retCode = dispOled_detectDisplayType(devName, i2cAddr, &dispType);
-        if (retCode != 0) {
-            return retCode;
+        // If this is called with NONE we try to autodetect the display
+        if (dispType == DISPLAY_TYPE_AUTO) {
+                // Auto-detect display. Detects if display present and type of OLED display
+                retCode = dispOled_detectDisplayType(devName, i2cAddr, &dispType);
+                if (retCode != 0) {
+                        return retCode;
+                }
         }
-    }
 
-    dispOled_initCtx(devName, dispCtx, dispType, i2cAddr);
+        dispOled_initCtx(devName, dispCtx, dispType, i2cAddr);
 
-    //Send all the commands to fully initialize the device.
-    switch (dispCtx->dispType) {
-    case DISPLAY_TYPE_SSD1306:
-        // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-        ROS_INFO("%s Setup for SSD1306 controller on the OLED display.", THIS_NODE_NAME);
-        retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
-        break;
-    case DISPLAY_TYPE_SH1106:
-        // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-        ROS_INFO("%s Setup for SH1106 controller on the OLED display.", THIS_NODE_NAME);
-        retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
-        break;
-    default:
-        retCode = IO_ERR_BAD_DISP_CONTEXT;
-        break;
-    }
-    if (retCode != 0) {
-        ROS_ERROR_ONCE("%s: Setup for OLED display failed with error 0x%04x", THIS_NODE_NAME, retCode);
-    }
+        //Send all the commands to fully initialize the device.
+        switch (dispCtx->dispType) {
+        case DISPLAY_TYPE_SSD1306:
+                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
+                ROS_INFO("%s Setup for SSD1306 controller on the OLED display.", THIS_NODE_NAME);
+                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &ssd1306_init_bytes[0], SSD1306_INIT_BYTE_COUNT);
+                break;
+        case DISPLAY_TYPE_SH1106:
+                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
+                ROS_INFO("%s Setup for SH1106 controller on the OLED display.", THIS_NODE_NAME);
+                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &sh1106_init_bytes[0], SH1106_INIT_BYTE_COUNT);
+                break;
+        default:
+                retCode = IO_ERR_BAD_DISP_CONTEXT;
+                break;
+        }
+        if (retCode != 0) {
+                ROS_ERROR_ONCE("%s: Setup for OLED display failed with error 0x%04x", THIS_NODE_NAME, retCode);
+        }
 
-    return retCode;
+        return retCode;
 }
 
 /*
@@ -534,37 +535,37 @@ int dispOled_init(std::string devName, dispCtx_t *dispCtx, int displayType, uint
  * @return              Returns 0 for ok or -1 for IO error
  */
 int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
-        int retCode = 0;
-        uint8_t cursorSetup[8];
+                int retCode = 0;
+                uint8_t cursorSetup[8];
 
-        switch (dispCtx->dispType) {
-        case DISPLAY_TYPE_SSD1306:
-                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
-                cursorSetup[1] = OLED_CMD_SET_COLUMN_RANGE;
-                cursorSetup[2] = column;            // Start of printing from left seg as 0
-                cursorSetup[3] = dispCtx->maxHorzPixel;     // last index of printing segments
-                cursorSetup[4] = OLED_CMD_SET_PAGE_RANGE;
-                cursorSetup[5] = line;                      // We assume only one line written to at a time
-                cursorSetup[6] = line;                      // We assume only one line written to at a time
+                switch (dispCtx->dispType) {
+                case DISPLAY_TYPE_SSD1306:
+                                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                                cursorSetup[1] = OLED_CMD_SET_COLUMN_RANGE;
+                                cursorSetup[2] = column;            // Start of printing from left seg as 0
+                                cursorSetup[3] = dispCtx->maxHorzPixel;     // last index of printing segments
+                                cursorSetup[4] = OLED_CMD_SET_PAGE_RANGE;
+                                cursorSetup[5] = line;                      // We assume only one line written to at a time
+                                cursorSetup[6] = line;                      // We assume only one line written to at a time
 
-                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 7);
+                                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
+                                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 7);
 
-        case DISPLAY_TYPE_SH1106:
-                // SH1106 has different addressing than SSD1306
-                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
-                cursorSetup[1] = 0xB0 | (line & 0xf);
-                cursorSetup[2] = 0x10 | (((column + dispCtx->horzOffset) & 0xf0) >> 4);  // Upper column address
-                cursorSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
+                case DISPLAY_TYPE_SH1106:
+                                // SH1106 has different addressing than SSD1306
+                                cursorSetup[0] = OLED_CONTROL_BYTE_CMD_STREAM;
+                                cursorSetup[1] = 0xB0 | (line & 0xf);
+                                cursorSetup[2] = 0x10 | (((column + dispCtx->horzOffset) & 0xf0) >> 4);  // Upper column address
+                                cursorSetup[3] = 0x00 | ((column + dispCtx->horzOffset)  & 0xf);         // Lower column address
 
-                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
-                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 4);
-                break;
-        default:
-                break;
-        }
+                                // We treat the 1st byte sort of like a 'register' but it is really a command stream mode to the chip
+                                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &cursorSetup[0], 4);
+                                break;
+                default:
+                                break;
+                }
 
-        return retCode;
+                return retCode;
 }
 
 /*
@@ -576,29 +577,29 @@ int dispOled_setCursor(dispCtx_t *dispCtx, int column, int line) {
  * @return              Returns 0 for ok or -1 for IO error
  */
 int dispOled_clearDisplay(dispCtx_t *dispCtx) {
-        int retCode = 0;
+                int retCode = 0;
 
-        uint8_t zero[140];
-        zero[0] = OLED_CONTROL_BYTE_DATA_STREAM;;
-        for (uint8_t idx = 1; idx < 136; idx++) {
-                zero[idx] = 0;      // All 0 is blank vertical segments of 8 bits all across the row
-        }
-        for (uint8_t line = 0; line <= dispCtx->maxLine; line++) {
+                uint8_t zero[140];
+                zero[0] = OLED_CONTROL_BYTE_DATA_STREAM;;
+                for (uint8_t idx = 1; idx < 136; idx++) {
+                                zero[idx] = 0;      // All 0 is blank vertical segments of 8 bits all across the row
+                }
+                for (uint8_t line = 0; line <= dispCtx->maxLine; line++) {
 
-                retCode |= dispOled_setCursor(dispCtx, 0, line);
-                if (retCode != 0) {
-                        return retCode;
+                                retCode |= dispOled_setCursor(dispCtx, 0, line);
+                                if (retCode != 0) {
+                                                return retCode;
+                                }
+
+                                // Clear one line
+                                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &zero[0], 
+                                        (dispCtx->maxHorzPixel+dispCtx->horzOffset)+dispCtx->endHorzPixel);
+                                if (retCode != 0) {
+                                                return retCode;
+                                }
                 }
 
-                // Clear one line
-                retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &zero[0], 
-                    (dispCtx->maxHorzPixel+dispCtx->horzOffset)+dispCtx->endHorzPixel);
-                if (retCode != 0) {
-                        return retCode;
-                }
-        }
-
-        return retCode;
+                return retCode;
 }
 
 /*
@@ -614,58 +615,58 @@ int dispOled_clearDisplay(dispCtx_t *dispCtx) {
  * @return              Returns 0 for ok or -1 for IO error
  */
 int dispOled_writeText(dispCtx_t *dispCtx, uint8_t line, uint8_t segment, uint8_t center, const char *textStr) {
-    int           retCode = 0;
-    const char    *text = textStr;
-    uint8_t       text_len = strlen(text);
-    uint8_t       dispData[DISPLAY_MAX_HORZ_PIXEL];
-    int           dispDataIdx = 1;
+        int           retCode = 0;
+        const char    *text = textStr;
+        uint8_t       text_len = strlen(text);
+        uint8_t       dispData[DISPLAY_MAX_HORZ_PIXEL];
+        int           dispDataIdx = 1;
 
-    dispData[0] = OLED_CONTROL_BYTE_DATA_STREAM;     // Data starts on byte after this 1st one
+        dispData[0] = OLED_CONTROL_BYTE_DATA_STREAM;     // Data starts on byte after this 1st one
 
-    if (line > 7) {
-            return -1;              // out of range line
-    }
-    if ((segment + (text_len * 8)) > dispCtx->maxHorzPixel) {
-            return -2;              // out of range starting segment to end of the print with 8x8 font
-    }
-    int startSegment = segment;          // MOD: When MAX_SEGMENT was 0x7F this was just    segment & MAX_SEGMENT
-    if (segment > (dispCtx->maxHorzPixel-1)) {
-            segment = dispCtx->maxHorzPixel-1; // Cap this to max end of line segment
-    }
-    if (center != 0) {
-            startSegment = (dispCtx->maxHorzPixel - (text_len * DISPLAY_CHAR_WIDTH)) / 2;
-    }
+        if (line > 7) {
+                        return -1;              // out of range line
+        }
+        if ((segment + (text_len * 8)) > dispCtx->maxHorzPixel) {
+                        return -2;              // out of range starting segment to end of the print with 8x8 font
+        }
+        int startSegment = segment;          // MOD: When MAX_SEGMENT was 0x7F this was just    segment & MAX_SEGMENT
+        if (segment > (dispCtx->maxHorzPixel-1)) {
+                        segment = dispCtx->maxHorzPixel-1; // Cap this to max end of line segment
+        }
+        if (center != 0) {
+                        startSegment = (dispCtx->maxHorzPixel - (text_len * DISPLAY_CHAR_WIDTH)) / 2;
+        }
 
-    retCode |= dispOled_setCursor(dispCtx, startSegment, line);
-    if (retCode != 0) {
-            return retCode;
-    }
+        retCode |= dispOled_setCursor(dispCtx, startSegment, line);
+        if (retCode != 0) {
+                        return retCode;
+        }
 
-    // Form pixels to send as data by lookup in font table
-    for (uint8_t i = 0; i < text_len; i++) {
-            // For each column of pixels for this char send a data byte which is one vertical column of pixels
-            for (uint8_t charCol = 0; charCol < DISPLAY_CHAR_WIDTH; charCol++) {
-                    dispData[dispDataIdx++] = font8x8_basic_tr[(int)(text[i])][charCol];
-            }
-    }
+        // Form pixels to send as data by lookup in font table
+        for (uint8_t i = 0; i < text_len; i++) {
+                        // For each column of pixels for this char send a data byte which is one vertical column of pixels
+                        for (uint8_t charCol = 0; charCol < DISPLAY_CHAR_WIDTH; charCol++) {
+                                        dispData[dispDataIdx++] = font8x8_basic_tr[(int)(text[i])][charCol];
+                        }
+        }
 
-    // Write the data to display
-    retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &dispData[0], dispDataIdx);
+        // Write the data to display
+        retCode |= i2c_write(&dispCtx->devName[0], dispCtx->i2cAddr, &dispData[0], dispDataIdx);
 
-    return retCode;
+        return retCode;
 }
 
 // ==============================================  END OLED DISPLAY API CALLS =================================
 
 // Optional helper to lock a semaphore if system requires a lock
 int ipc_sem_lock(int semLock) {
-    // THIS IS A STUB
-    return 0;
+        // THIS IS A STUB
+        return 0;
 }
 // Optional helper to unlock a semaphore if system requires a lock
 int ipc_sem_unlock(int semLock) {
-    // THIS IS A STUB
-    return 0;
+        // THIS IS A STUB
+        return 0;
 }
 
 
@@ -681,60 +682,60 @@ int ipc_sem_unlock(int semLock) {
  */
 int  displayUpdate(std::string text, int attributes, int row, int column, int numChars, int semLock)
 {
-  int  messageLength = text.length();
-  bool dbgPrint = false;
+    int  messageLength = text.length();
+    bool dbgPrint = false;
 
-  if (numChars > 0) {
-    messageLength = numChars;
-  }
+    if (numChars > 0) {
+        messageLength = numChars;
+    }
 
-  ROS_INFO("%s: Write '%s' to row %d and column %d\n", THIS_NODE_NAME, text.c_str(), row, column);
+    ROS_INFO("%s: Write '%s' to row %d and column %d\n", THIS_NODE_NAME, text.c_str(), row, column);
 
-  dispCtx_t oledDispCtx;
-  char charBuf[120];
-  int segment = column * DISPLAY_CHAR_WIDTH;
-  int dispRow  = row;   // Bypass the system info area
-  int maxChars = oledDispCtx.maxColumn - 1;
-  int lineChars = messageLength;
+    dispCtx_t oledDispCtx;
+    char charBuf[120];
+    int segment = column * DISPLAY_CHAR_WIDTH;
+    int dispRow  = row;   // Bypass the system info area
+    int maxChars = oledDispCtx.maxColumn - 1;
+    int lineChars = messageLength;
 
-  // We only initialize display context and do not re-initialize actual display
-  dispOled_initCtx(OLED_I2C_DEVICE, &oledDispCtx, g_oledDisplayCtx.dispType, OLED_DISPLAY_ADDR);
+    // We only initialize display context and do not re-initialize actual display
+    dispOled_initCtx(OLED_I2C_DEVICE, &oledDispCtx, g_oledDisplayCtx.dispType, OLED_DISPLAY_ADDR);
 
-  // Would be nice to account for non-zero cursor due to cursor control sometime too ...
-  if (messageLength > oledDispCtx.maxColumn) {
-    ROS_ERROR("%s: Unsupported character count of %d\n", THIS_NODE_NAME, messageLength);
-    return -9;
-  }
+    // Would be nice to account for non-zero cursor due to cursor control sometime too ...
+    if (messageLength > oledDispCtx.maxColumn) {
+        ROS_ERROR("%s: Unsupported character count of %d\n", THIS_NODE_NAME, messageLength);
+        return -9;
+    }
 
-  if (lineChars > maxChars) lineChars = maxChars;    // Hard truncate max char count for this display
-  strncpy(&charBuf[0], text.c_str(), lineChars);
-  charBuf[lineChars] = 0;
+    if (lineChars > maxChars) lineChars = maxChars;    // Hard truncate max char count for this display
+    strncpy(&charBuf[0], text.c_str(), lineChars);
+    charBuf[lineChars] = 0;
 
-  // Write out the characters to the display
-  dispOled_writeText(&oledDispCtx, dispRow, segment, DISP_TEXT_START_MODE, &charBuf[0]);
+    // Write out the characters to the display
+    dispOled_writeText(&oledDispCtx, dispRow, segment, DISP_TEXT_START_MODE, &charBuf[0]);
 
-  return 0;
+    return 0;
 }
 
 // Driver to set the power on default message for the display
 int displaySetStartupString(int line, std::string text, int semLock)
 {
-  std::string module = "displaySetStartupString";
-  int  messageLength = text.length();
-  bool dbgPrint = false;
+    std::string module = "displaySetStartupString";
+    int  messageLength = text.length();
+    bool dbgPrint = false;
 
-  ROS_ERROR("%s: OLED display startup string not yet supported, ignore\n", THIS_NODE_NAME);
-  return 0;
+    ROS_ERROR("%s: OLED display startup string not yet supported, ignore\n", THIS_NODE_NAME);
+    return 0;
 }
 
 // Driver to set the LCD backlight brightness
 int displaySetBrightness(int brightness, int semLock)
 {
-  std::string module = "displaySetBrightness";
-  bool dbgPrint = false;
+    std::string module = "displaySetBrightness";
+    bool dbgPrint = false;
 
-  ROS_ERROR("%s: OLED display brightness setting not supported, iignore\n", THIS_NODE_NAME);
-  return 0;
+    ROS_ERROR("%s: OLED display brightness setting not supported, iignore\n", THIS_NODE_NAME);
+    return 0;
 }
 
 /**
@@ -742,28 +743,28 @@ int displaySetBrightness(int brightness, int semLock)
  */
 void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
 {
-  ROS_INFO("%s heard display output msg: of actionType %d row %d column %d numChars %d attr 0x%x text %s comment %s]",
-                THIS_NODE_NAME, msg->actionType, msg->row, msg->column, msg->numChars, msg->attributes,
-                msg->text.c_str(), msg->comment.c_str());
+    ROS_INFO("%s heard display output msg: of actionType %d row %d column %d numChars %d attr 0x%x text %s comment %s]",
+                                THIS_NODE_NAME, msg->actionType, msg->row, msg->column, msg->numChars, msg->attributes,
+                                msg->text.c_str(), msg->comment.c_str());
 
-  int i2cSemLockId = -9;
+    int i2cSemLockId = -9;
 
-   // Now send data to the display
+     // Now send data to the display
 
-   switch (msg->actionType) {
-     case oled_display_node::DisplayOutput::DISPLAY_STARTUP_STRING:
-       displaySetStartupString(msg->row, msg->text.c_str(), i2cSemLockId);
-       break;
-     case oled_display_node::DisplayOutput::DISPLAY_SET_BRIGHTNESS:
-       displaySetBrightness(msg->attributes, i2cSemLockId);
-       break;
-     case oled_display_node::DisplayOutput::DISPLAY_ALL:
-     case oled_display_node::DisplayOutput::DISPLAY_SUBSTRING:
-       displayUpdate(msg->text.c_str(), msg->attributes, msg->row, msg->column, msg->numChars, i2cSemLockId);
-       break;
-     default:
-       break;
-   }
+     switch (msg->actionType) {
+         case oled_display_node::DisplayOutput::DISPLAY_STARTUP_STRING:
+            displaySetStartupString(msg->row, msg->text.c_str(), i2cSemLockId);
+            break;
+         case oled_display_node::DisplayOutput::DISPLAY_SET_BRIGHTNESS:
+            displaySetBrightness(msg->attributes, i2cSemLockId);
+            break;
+         case oled_display_node::DisplayOutput::DISPLAY_ALL:
+         case oled_display_node::DisplayOutput::DISPLAY_SUBSTRING:
+            displayUpdate(msg->text.c_str(), msg->attributes, msg->row, msg->column, msg->numChars, i2cSemLockId);
+            break;
+         default:
+            break;
+     }
 }
 
 
@@ -772,16 +773,16 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
  */
 void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
 {
-  std::string percent = std::to_string((int)((msg->percentage * 100) + 0.5))+"%";
+    std::string percent = std::to_string((int)((msg->percentage * 100) + 0.5))+"%";
 
-  switch(percent.length()){
-    case 4: g_batteryPercentage = percent; break;
-    case 3: g_batteryPercentage = " "+percent; break;
-    case 2: g_batteryPercentage = "  "+percent; break;
-    default: g_batteryPercentage = "    ";
-  }
+    switch(percent.length()){
+        case 4: g_batteryPercentage = " "+percent; break;
+        case 3: g_batteryPercentage = "  "+percent; break;
+        case 2: g_batteryPercentage = "   "+percent; break;
+        default: g_batteryPercentage = "     ";
+    }
 
-  g_batteryVoltage = msg->voltage;
+    g_batteryVoltage = msg->voltage;
 }
 
 /**
@@ -789,144 +790,145 @@ void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
  */
 void motorPowerActiveApiCallback(const std_msgs::Bool::ConstPtr& msg)
 {
-  int32_t newPowerState;
-  if (msg->data) {
-    newPowerState = 1;
-  } else {
-    newPowerState = 0;
-  }
-  if (newPowerState != g_motorPowerActive) {
-    ROS_INFO("%s Motor power active went from %d to %d", THIS_NODE_NAME, g_motorPowerActive, newPowerState);
-  }
+    std::string newPowerState;
+    if (msg->data) {
+        newPowerState = "ON ";
+    } else {
+        newPowerState = "OFF";
+    }
+    if (newPowerState != g_motorPowerActive) {
+        ROS_INFO("%s Motor power active went from %s to %s", THIS_NODE_NAME, g_motorPowerActive.c_str(), newPowerState.c_str());
+    }
 
-  g_motorPowerActive = newPowerState;
-  return;
+    g_motorPowerActive = newPowerState;
+    return;
 }
 
-
-
+/**
+ * Receive messages for firmware version
+ */
+void firmwareVersionCallback(const std_msgs::String::ConstPtr& msg)
+{
+    g_firmwareVersion = msg->data.substr(0, msg->data.find(' '));
+    ROS_INFO("%s Firmware version received: %s", THIS_NODE_NAME, msg->data.c_str());
+    return;
+}
 
 
 int main(int argc, char **argv)
 {
-  double updateDelay = 0.25;
+    double updateDelay = 0.25;
 
-  // The ros::init() function initializes ROS and needs to see argc and argv
-  ros::init(argc, argv, THIS_NODE_NAME);
+    // The ros::init() function initializes ROS and needs to see argc and argv
+    ros::init(argc, argv, THIS_NODE_NAME);
 
-  // Setup a NodeHandle for the main access point to communications with the ROS system.
-  ros::NodeHandle nh;
+    // Setup a NodeHandle for the main access point to communications with the ROS system.
+    ros::NodeHandle nh;
 
-  ROS_INFO("%s OLED Display node starting.", THIS_NODE_NAME);
+    ROS_INFO("%s OLED Display node starting.", THIS_NODE_NAME);
 
-  // Get our hostname on the network
-  std::string hostname = getPopen("uname -n");
+    // Get our hostname on the network
+    std::string hostname = getPopen("uname -n");
 
-  // Here we will fetch the current IP address but we assume this node does not start till it is valid
-  std::string displayedETHAddress;
-  std::string displayedWLANAddress;
-  getIpAddressses(displayedETHAddress, displayedWLANAddress, 1);
+    // Here we will fetch the current IP address but we assume this node does not start till it is valid
+    std::string displayedETHAddress;
+    std::string displayedWLANAddress;
+    getIpAddressses(displayedETHAddress, displayedWLANAddress, 1);
 
-  char dispBuf[32];
-  int  dispError = 0;
+    char dispBuf[32];
+    int  dispError = 0;
 
-  ROS_INFO("%s Initialize OLED display.", THIS_NODE_NAME);
-  dispError = dispOled_init(OLED_I2C_DEVICE, &g_oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
+    ROS_INFO("%s Initialize OLED display.", THIS_NODE_NAME);
+    dispError = dispOled_init(OLED_I2C_DEVICE, &g_oledDisplayCtx, OLED_DISPLAY_TYPE, OLED_DISPLAY_ADDR);
 
-  if (dispError == 0) {
-      dispOled_clearDisplay(&g_oledDisplayCtx);
-      ros::Duration(1.0).sleep();
-      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
-      ros::Duration(updateDelay).sleep();
-      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
-      ros::Duration(updateDelay).sleep();
-      dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
-      ros::Duration(updateDelay).sleep();
+    if (dispError == 0) {
+        dispOled_clearDisplay(&g_oledDisplayCtx);
+        ros::Duration(1.0).sleep();
+        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+        ros::Duration(updateDelay).sleep();
+        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
+        ros::Duration(updateDelay).sleep();
+        dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
+        ros::Duration(updateDelay).sleep();
 
-      ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
-      ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
-      ROS_TOPIC_DISPLAY_NODE, "DisplayOutput" );
-  } else {
-      ROS_ERROR("%s: Display did not initialize properly and will not be used! ", THIS_NODE_NAME);
-      return 0;
-  }
-
-  // Set to subscribe to the display topic and we then get callbacks for each message
-  ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 1000, displayApiCallback);
-
-  // Set to subscribe to the battery_state topic and we then get callbacks for each message
-  ros::Subscriber sub2 = nh.subscribe("battery_state", 1000, batteryStateApiCallback);
-
-  // Set to subscribe to the motor_power_active topic
-  ros::Subscriber sub3 = nh.subscribe("motor_power_active", 1000, motorPowerActiveApiCallback);
-
-  // We will refresh the lines from time to time in case IP addr has changed
-  ros::Rate loop_rate(0.5);
-  int32_t loopIdx = 0;
-
-  // mainloop:
-  while ((dispError == 0) && ros::ok())
-  {
-    loopIdx++;
-    hostname = getPopen("uname -n");
-    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
-    ros::Duration(updateDelay).sleep();
-
-    getIpAddressses(displayedETHAddress, displayedWLANAddress, 0);
-    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
-    ros::Duration(updateDelay).sleep();
-    dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
-    ros::Duration(updateDelay).sleep();
-
-    // If there is a battery_state topic and we get the callback also show battery voltage
-    if (g_batteryVoltage > 0.0) {
-      ROS_DEBUG("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
-
-      // Control what shows up after the voltage reading.
-      // If you change the text, use same number of chars so display does not move around on the line
-      std::stringstream stream;
-      stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
-
-      if (g_batteryVoltage <= BAT_LOW_LEVEL && (loopIdx % 2) == 0){
-        stream << "V LOW";
-      }
-      else if (g_batteryVoltage >= BAT_CHARGING_LEVEL && (loopIdx % 3) == 0){
-        stream << " CHRG";
-      }
-      else{
-        stream << "V" << g_batteryPercentage;
-      }
-
-      std::string battText = "Bat:" + stream.str();
-      dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
-      ros::Duration(updateDelay).sleep();
+        ROS_INFO("%s: Display subsystem ready! ", THIS_NODE_NAME);
+        ROS_INFO("%s: Listening on topic /%s for messages of type %s", THIS_NODE_NAME,
+        ROS_TOPIC_DISPLAY_NODE, "DisplayOutput" );
+    } else {
+        ROS_ERROR("%s: Display did not initialize properly and will not be used! ", THIS_NODE_NAME);
+        return 0;
     }
 
+    // Display topic and we then get callbacks for each message
+    ros::Subscriber sub = nh.subscribe(ROS_TOPIC_DISPLAY_NODE, 100, displayApiCallback);
 
-    // If there is a motor_power_active topic and we get the callback also show motor power status
-    if (g_motorPowerActive >= 0) {
-        ROS_DEBUG("%s motor power active is now %d", THIS_NODE_NAME, g_motorPowerActive);
+    // Battery_state topic and we then get callbacks for each message
+    ros::Subscriber sub2 = nh.subscribe("battery_state", 100, batteryStateApiCallback);
+
+    // Motor_power_active topic
+    ros::Subscriber sub3 = nh.subscribe("motor_power_active", 100, motorPowerActiveApiCallback);
+
+    // Firmware state topic
+    ros::Subscriber sub4 = nh.subscribe("firmware_version", 100, firmwareVersionCallback);
+
+    // We will refresh the lines from time to time in case IP addr has changed
+    ros::Rate loop_rate(0.5);
+    int32_t loopIdx = 0;
+
+    // mainloop:
+    while ((dispError == 0) && ros::ok())
+    {
+        loopIdx++;
+        hostname = getPopen("uname -n");
+        dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_HOSTNAME, 0, DISP_TEXT_START_MODE, hostname.c_str());
+        ros::Duration(updateDelay).sleep();
+
+        getIpAddressses(displayedETHAddress, displayedWLANAddress, 0);
+        dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_WLAN, 0, DISP_TEXT_START_MODE, displayedWLANAddress.c_str());
+        ros::Duration(updateDelay).sleep();
+        dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_IP_ETH, 0, DISP_TEXT_START_MODE, displayedETHAddress.c_str());
+        ros::Duration(updateDelay).sleep();
+
+        // If there is a battery_state topic and we get the callback also show battery voltage
+        if (g_batteryVoltage > 0.0) {
+            ROS_DEBUG("%s Battery voltage is now %4.1f volts.", THIS_NODE_NAME, g_batteryVoltage);
+
+            // Control what shows up after the voltage reading.
+            // If you change the text, use same number of chars so display does not move around on the line
+            std::stringstream stream;
+            stream << std::fixed << std::setprecision(1) << g_batteryVoltage;
+
+            if (g_batteryVoltage <= BAT_LOW_LEVEL && (loopIdx % 2) == 0){
+                stream << "V  LOW";
+            }
+            else if (g_batteryVoltage >= BAT_CHARGING_LEVEL && (loopIdx % 3) != 0){
+                stream << "V CHRG";
+            }
+            else{
+                stream << "V" << g_batteryPercentage;
+            }
+
+            std::string battText = "Bat:" + stream.str();
+            dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_BATT_VOLTS, 1, DISP_TEXT_START_MODE, battText.c_str());
+            ros::Duration(updateDelay).sleep();
+        }
 
         // If you change the text, use same number of chars so display does not move around on the line
-        std::stringstream powStream;
-	if (g_motorPowerActive > 0) {
-            powStream <<   " ON";
-        }else {
-            powStream <<   "OFF";
-        }
-        std::string motPowerText = "Mot Power " + powStream.str();
+        std::stringstream infoStream;
+        infoStream << "MOT:" << g_motorPowerActive << " FW:" << g_firmwareVersion;
+
+        std::string motPowerText = infoStream.str();
         dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_MOTOR_POWER, 1, DISP_TEXT_START_MODE, motPowerText.c_str());
         ros::Duration(updateDelay).sleep();
+
+        ros::spinOnce();
+        loop_rate.sleep();
     }
 
-    ros::spinOnce();
-    loop_rate.sleep();
-  }
+    // ros::spin() will enter a loop allowing callbacks to happen. Exits on Ctrl-C
+    ros::spin();
 
-  // ros::spin() will enter a loop allowing callbacks to happen. Exits on Ctrl-C
-  ros::spin();
-
-  return 0;
+    return 0;
 }
 
 #endif // __arm__ || __aarch64__
