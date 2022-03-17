@@ -915,7 +915,7 @@ int main(int argc, char **argv)
 
         // If you change the text, use same number of chars so display does not move around on the line
         std::stringstream infoStream;
-        infoStream << "MOT:" << g_motorPowerActive << " FW:" << g_firmwareVersion;
+        infoStream << "Mot:" << g_motorPowerActive << " FW:" << g_firmwareVersion;
 
         std::string motPowerText = infoStream.str();
         dispError |= dispOled_writeText(&g_oledDisplayCtx, DISP_LINE_MOTOR_POWER, 1, DISP_TEXT_START_MODE, motPowerText.c_str());
