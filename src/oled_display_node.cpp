@@ -773,12 +773,13 @@ void displayApiCallback(const oled_display_node::DisplayOutput::ConstPtr& msg)
  */
 void batteryStateApiCallback(const sensor_msgs::BatteryState::ConstPtr& msg)
 {
-    std::string percent = std::to_string((int)((msg->percentage * 100) + 0.5))+"%";
+    std::stringstream percent;
+    percent << (int)((msg->percentage * 100) + 0.5) << "%";
 
-    switch(percent.length()){
-        case 4: g_batteryPercentage = " "+percent; break;
-        case 3: g_batteryPercentage = "  "+percent; break;
-        case 2: g_batteryPercentage = "   "+percent; break;
+    switch(percent.str().length()){
+        case 4: g_batteryPercentage = " "+percent.str(); break;
+        case 3: g_batteryPercentage = "  "+percent.str(); break;
+        case 2: g_batteryPercentage = "   "+percent.str(); break;
         default: g_batteryPercentage = "     ";
     }
 
