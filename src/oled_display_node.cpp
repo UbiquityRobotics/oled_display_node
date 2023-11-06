@@ -810,8 +810,15 @@ void motorPowerActiveApiCallback(const std_msgs::Bool::ConstPtr& msg)
  */
 void firmwareVersionCallback(const std_msgs::String::ConstPtr& msg)
 {
+    std::string newFwVersion = msg->data.substr(0, msg->data.find(' '));
+
+    if (newFwVersion.compare(g_firmwareVersion) != 0) {  // log any change to the value
+        ROS_INFO("%s New Firmware version received: %s. Old value was %s.", THIS_NODE_NAME,
+            msg->data.c_str(), g_firmwareVersion.c_str());
+    }
+
+    // Always save the version received.
     g_firmwareVersion = msg->data.substr(0, msg->data.find(' '));
-    ROS_INFO("%s Firmware version received: %s", THIS_NODE_NAME, msg->data.c_str());
     return;
 }
 
