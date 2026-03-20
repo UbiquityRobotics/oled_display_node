@@ -1,3 +1,0 @@
-<launch>
-  <node pkg="oled_display_node" type="oled_display_node" name="oled_display_node" output="screen" respawn="false" />
-</launch>

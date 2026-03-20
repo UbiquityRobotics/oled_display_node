@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 """
 Copyright (c) 2019, Ubiquity Robotics
@@ -26,30 +26,26 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 """
-Example client program for writing to display using ROS topic
+Example client program for writing to display using ROS 2 topic
 """
 
-import rospy
+import rclpy
+from rclpy.node import Node
+import time
 
 # our custom messages for the commands we will follow
 from oled_display_node.msg import DisplayOutput
 
-import traceback
-import time
 
-
-class Controller:
+class Controller(Node):
     """
     Constructor for our class
     """
     def __init__(self):
-       rospy.init_node('controller')
-
-       # Time per loop for the main control
-       self.loop_msec = 50
+       super().__init__('controller')
 
        # A publisher for sending commands to the follower node
-       self.displayCmdPub = rospy.Publisher("/display_node", DisplayOutput, queue_size=1)
+       self.displayCmdPub = self.create_publisher(DisplayOutput, "/display_node", 10)
 
     def publishDisplayCommand(self, row, column, text, comment):
        numChars = len(text)
@@ -57,38 +53,39 @@ class Controller:
          numChars = 15
 
        dispMsg = DisplayOutput()
-       dispMsg.actionType    = 2               # Just use MSG_DISPLAY_SUBSTRING
+       dispMsg.action_type    = 2               # Just use MSG_DISPLAY_SUBSTRING
        dispMsg.row           = row             # Display row with 0 as top row
        dispMsg.column        = column          # Display column in pixels
-       dispMsg.numChars      = numChars        # Number of chars to be written
+       dispMsg.num_chars      = numChars        # Number of chars to be written
        dispMsg.attributes    = 0               # Just write with no attributes
        dispMsg.text          = text            # The text to be written
        dispMsg.comment       = comment         # Comment in the message, no functional use
        self.displayCmdPub.publish(dispMsg)
 
-
-    """
-    Main loop
-    """
     def run(self):
-       print "ROS publisher publishing commands to display topic"
+       self.get_logger().info("ROS 2 publisher publishing commands to display topic")
 
-       rospy.sleep(1.0)
+       time.sleep(1.0)
        self.publishDisplayCommand(3, 2, "Data for the", "Write to a line")
-       rospy.sleep(1.0)
+       time.sleep(1.0)
        self.publishDisplayCommand(4, 2, "Application ", "Write to a line")
-       rospy.sleep(1.0)
+       time.sleep(1.0)
        self.publishDisplayCommand(5, 2, "will now be ", "Write to a line")
-       rospy.sleep(1.0)
+       time.sleep(1.0)
        self.publishDisplayCommand(6, 2, "written to  ", "Write to a line")
-       rospy.sleep(1.0)
+       time.sleep(1.0)
        self.publishDisplayCommand(7, 2, "OLED display", "Write to a line")
-       rospy.sleep(1.0)
-       print "Commands sent "
+       time.sleep(1.0)
+       self.get_logger().info("Commands sent")
 
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Controller()
+    node.run()
+    # No need to spin since run() finishes and we exit
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == "__main__":
-    # Create an instance of our follow class
-    node = Controller()
-    # run it
-    node.run()
+    main()

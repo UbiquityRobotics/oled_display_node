@@ -1,55 +1,100 @@
+# OLED Display Output ROS 2 Node
 
-# OLED Display Output ROS Node
+This module implements a ROS 2 node that provides display updates to an OLED display connected via I2C.
+The node initializes with system information (Hostname, IP, Battery, Motor status) and subscribes to a ROS topic for custom message updates.
+Full line or line substring updates are supported.
 
+## Requirements
 
-This module implements a ROS node (process) that does Display Updates to an OLED display connected on I2C.
-The node does some initial messages and then will subscribe to an inbound ROS topic  and act on messages for update of lines on the display. 
-Full line or line substring updates starting at a given X pixel on the given line are supported.
+- **Hardware**: 
+    - Raspberry Pi 4 (or similar ARM-based SBC)
+    - 1.3" I2C OLED Display (SH1106 controller preferred, SSD1306 also supported)
+- **OS**: Ubuntu 24.04 LTS (Noble Numbat)
+- **ROS 2**: Jazzy Jalisco
 
-The tested display is the 1.3" diagonal display using a SH1106 chip controlled over the I2C bus.
-We prefer the pinout with  Ground, Vcc, SCL then SDA lines for use with Ubiquity Robotics rev 5.x main boards.
-These displays are easily found on EBay but be sure the controller chip is the SH1106 and that they will work with a 3.3V supply and 3.3V I2C control.
+## Hardware Setup & Dependencies
 
-The 1.3" OLED display using the SH1106 controller chip offers 8 lines of 15 characters 
-The SH1106 is closely compatible with SSD1306 display that is typically the 0.96" OLED display.
-The difference is mostly at initialization and then changing the pixel X offset for the SH1106 control chip with a RAM space of 132*64, while the SSD1306 pixel space is 128*64.
+### 1. Enable I2C on Raspberry Pi
+The display communicates over I2C (typically on `/dev/i2c-1`). Ensure I2C is enabled:
+```bash
+sudo raspi-config
+# Navigate to Interface Options -> I2C -> Enable
+```
+Or add `dtparam=i2c_arm=on` to `/boot/firmware/config.txt` and reboot.
 
-### ROS Paramaters
+### 2. Install System Dependencies
+Install `i2c-tools` to verify the connection:
+```bash
+sudo apt update
+sudo apt install i2c-tools
+```
+Verify the display is detected (typically at address `0x3c`):
+```bash
+i2cdetect -y 1
+```
 
-* There are currently no ROS parameters available.
+### 3. Permissions
+Ensure your user is in the `i2c` group to access the device without sudo:
+```bash
+sudo usermod -aG i2c $USER
+# Log out and back in for changes to take effect
+```
 
-### Publications
+## Installation
 
-* The node does not publish messasges to any ROS topic
+### 1. Create a Workspace
+If you don't have one, create a colcon workspace:
+```bash
+mkdir -p ~/ros2_ws/src
+cd ~/ros2_ws/src
+```
+
+### 2. Clone and Install Dependencies
+Clone this repository into `src`, then use `rosdep` to install ROS 2 dependencies:
+```bash
+cd ~/ros2_ws
+rosdep install -i --from-path src --rosdistro jazzy -y
+```
+
+### 3. Build
+```bash
+colcon build --packages-select oled_display_node
+source install/setup.bash
+```
+
+## Running the Node
+
+### Launching the Node
+Use the provided ROS 2 launch file:
+```bash
+ros2 launch oled_display_node display_launch.py
+```
+The node will start and periodically display:
+- **Line 0**: Hostname
+- **Line 1**: WLAN0 IP Address
+- **Line 3**: ETH0 IP Address
+- **Line 5**: Battery Voltage (if `battery_state` topic is active)
+- **Line 7**: Motor Power & Firmware Version
+
+### Parameters
+- `update_delay_ms`: (int) Delay between line updates in milliseconds. Default: `250`.
 
 ### Subscriptions
+- `display_node` (`oled_display_node/msg/DisplayOutput`): Listen for custom display updates.
+- `battery_state` (`sensor_msgs/msg/BatteryState`): Updates battery voltage display.
+- `motor_power_active` (`std_msgs/msg/Bool`): Updates motor status.
+- `firmware_version` (`std_msgs/msg/String`): Updates firmware version display.
 
-* `oled_display_node` (msgs/DisplayOutput): Listen for display updates
+## Test or Example Script
+A Python script is provided to test sending custom messages to the display:
+```bash
+ros2 run oled_display_node display_writer.py
+```
 
-### The Qualified OLED Display we have Tested 
-
-There are several displays that are 1.3" displays using the SH1106 controller that will allow powering from 3.3V and also allow a 3.3V I2C bus.  The pinout MUST be from left to right:   Ground, 3.3V (Vcc), SCL and SDA.
-Sometimes this display is incorrectly stating the controller is a SSH1106 display but it is a point of confusion and is the SH1106.    We have identified a specific vendor as well.   You may purchase this display on amazon.com and look for this text in the title 'HiLetgo 1.3" IIC I2C Serial 128x64 SSH1106 OLED LCD Display LCD Module'.  there are cheaper solutions but only by a few dollars so we wish to only stand behind this display officially.  We claim support for this display on the rev 5.1 motor controller board and this display will plug right in to our female connector on the rev 5.1 board.   The Rev 5.0 controller used a male pin jack so you would have to modify your display with a female socket to use on a rev 5.0 board. 
-
-### Manually Launching the Node
-
-* roslaunch oled_display_node display.launch
-
-The node will start and then print the linux network name on top line and then the IP address will be on the 3rd line.
-
-### Launching the Node From a ROS launch file
-
-To launch the node from a ROS launch file add to the launch file the 2 lines shown below.
-As an example you can add these two line to an Ubiquity Robotics Magni host processor 
-in the file /opt/ros/kinetic/share/magni_bringup/launch/core.launch although we plan on configurable support in early 2020.
-
-    <node pkg="oled_display_node" type="oled_display_node" name="oled_display_node" output="screen">
-    </node>
-
-### Test or Example Script
-A very simple python script that sends a few messasges to the display node has been supplied.
-Use the python script 'display_writer.py` in the scripts folder to test the display.
-
-* python ./scripts/display_writer.py
+## Qualified OLED Displays
+The tested display is the 1.3" diagonal display using a **SH1106** chip.
+- **Pinout**: Ground, VCC (3.3V), SCL, SDA.
+- **Recommendation**: HiLetgo 1.3" IIC I2C Serial 128x64 SSH1106 OLED LCD Display.
+- **Note**: 0.96" SSD1306 displays are also supported but may require adjustment if the pixel offset differs.
 
 
