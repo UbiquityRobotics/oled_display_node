@@ -22,17 +22,18 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 include_directories(include)
 
 # Executable
-add_executable(oled_display_node src/oled_display_node.cpp)
-ament_target_dependencies(oled_display_node
+add_executable(oled_display_node_exe src/oled_display_node.cpp)
+set_target_properties(oled_display_node_exe PROPERTIES OUTPUT_NAME oled_display_node)
+ament_target_dependencies(oled_display_node_exe
   rclcpp
   std_msgs
   sensor_msgs
 )
 rosidl_get_typesupport_target(cpp_typesupport_target "${PROJECT_NAME}" "rosidl_typesupport_cpp")
-target_link_libraries(oled_display_node "${cpp_typesupport_target}")
+target_link_libraries(oled_display_node_exe "${cpp_typesupport_target}")
 
 # Install
-install(TARGETS oled_display_node
+install(TARGETS oled_display_node_exe
   DESTINATION lib/${PROJECT_NAME}
 )
 
